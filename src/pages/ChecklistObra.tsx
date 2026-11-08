@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
-import { ChevronLeft, Camera, WifiOff, RefreshCw, Check } from 'lucide-react'
+import { ChevronLeft, Camera, ImageIcon, WifiOff, RefreshCw, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   type Ambiente,
@@ -210,19 +210,45 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
                         {item.nome}
                       </label>
 
-                      <label className="cursor-pointer text-muted-foreground hover:text-foreground">
-                        <Camera className="h-4 w-4" />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          className="hidden"
-                          onChange={(e) => {
-                            const arquivo = e.target.files?.[0]
-                            if (arquivo) anexarFoto(item, arquivo)
-                          }}
-                        />
-                      </label>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {/* Tirar foto: capture="environment" abre a câmera direto no celular */}
+                        <label
+                          className="cursor-pointer text-muted-foreground hover:text-foreground"
+                          title="Tirar foto"
+                        >
+                          <Camera className="h-4 w-4" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            aria-label="Tirar foto"
+                            onChange={(e) => {
+                              const arquivo = e.target.files?.[0]
+                              if (arquivo) anexarFoto(item, arquivo)
+                              e.target.value = ''
+                            }}
+                          />
+                        </label>
+                        {/* Escolher da galeria: sem capture, o celular abre o seletor de fotos */}
+                        <label
+                          className="cursor-pointer text-muted-foreground hover:text-foreground"
+                          title="Escolher da galeria"
+                        >
+                          <ImageIcon className="h-4 w-4" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            aria-label="Escolher da galeria"
+                            onChange={(e) => {
+                              const arquivo = e.target.files?.[0]
+                              if (arquivo) anexarFoto(item, arquivo)
+                              e.target.value = ''
+                            }}
+                          />
+                        </label>
+                      </div>
                     </div>
 
                     {urlFoto(item) && (
