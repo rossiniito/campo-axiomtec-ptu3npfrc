@@ -73,17 +73,25 @@ migrate(
       ambiente.itens.forEach((par, itemIndex) => {
         const nome = par[0]
         const concluido = par[1]
-        try {
-          app.findFirstRecordByData('itens', 'nome', nome)
-        } catch (_) {
-          const item = new Record(itensCol)
-          item.set('obra', obra.id)
-          item.set('ambiente', ambRecord.id)
-          item.set('nome', nome)
-          item.set('concluido', concluido)
-          item.set('ordem', itemIndex)
-          app.save(item)
-        }
+        // "Spot Mini" existe em dois ambientes: a checagem é por ambiente + nome,
+        // nunca só pelo nome, senão o segundo é descartado como duplicata.
+        const existentes = app.findRecordsByFilter(
+          'itens',
+          'ambiente = {:ambiente} && nome = {:nome}',
+          '',
+          1,
+          0,
+          { ambiente: ambRecord.id, nome: nome },
+        )
+        if (existentes.length > 0) return
+
+        const item = new Record(itensCol)
+        item.set('obra', obra.id)
+        item.set('ambiente', ambRecord.id)
+        item.set('nome', nome)
+        item.set('concluido', concluido)
+        item.set('ordem', itemIndex)
+        app.save(item)
       })
     })
   },
