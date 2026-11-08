@@ -87,21 +87,33 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
     setPendentes(lerFila().length)
   }
 
-  async function anexarFoto(item: Item, arquivo: File) {
+  async function anexarFotos(item: Item, arquivos: File[]) {
+    if (arquivos.length === 0) return
     if (!online) {
-      toast.error('Foto precisa de conexão', {
+      toast.error(arquivos.length > 1 ? 'Fotos precisam de conexão' : 'Foto precisa de conexão', {
         description: 'O texto e o checklist funcionam offline; a foto só sobe com sinal.',
       })
       return
     }
+    let enviadas = 0
+    for (const arquivo of arquivos) {
+      try {
+        await enviarFoto(item.id, arquivo)
+        enviadas++
+      } catch {
+        toast.error('Não foi possível enviar uma das fotos', {
+          description: arquivo.name,
+        })
+      }
+    }
+    if (enviadas === 0) return
     try {
-      await enviarFoto(item.id, arquivo)
       await baixarTudo()
       carregarDoCache()
-      toast.success('Foto anexada')
     } catch {
-      toast.error('Não foi possível enviar a foto')
+      /* o envio já foi feito; a próxima sincronização atualiza a tela */
     }
+    toast.success(enviadas === 1 ? 'Foto anexada' : `${enviadas} fotos anexadas`)
   }
 
   async function apagarFotoDoItem(item: Item, nomeArquivo: string) {
@@ -244,7 +256,7 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
                             aria-label="Tirar foto"
                             onChange={(e) => {
                               const arquivo = e.target.files?.[0]
-                              if (arquivo) anexarFoto(item, arquivo)
+                              if (arquivo) anexarFotos(item, [arquivo])
                               e.target.value = ''
                             }}
                           />
@@ -258,11 +270,12 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
                           <input
                             type="file"
                             accept="image/*"
+                            multiple
                             className="hidden"
                             aria-label="Escolher da galeria"
                             onChange={(e) => {
-                              const arquivo = e.target.files?.[0]
-                              if (arquivo) anexarFoto(item, arquivo)
+                              const arquivos = Array.from(e.target.files ?? [])
+                              anexarFotos(item, arquivos)
                               e.target.value = ''
                             }}
                           />
