@@ -4,19 +4,20 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
-import { ChevronLeft, Camera, ImageIcon, WifiOff, RefreshCw, Check } from 'lucide-react'
+import { ChevronLeft, Camera, ImageIcon, WifiOff, RefreshCw, Check, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   type Ambiente,
   type Item,
   type Obra,
+  apagarFoto,
   comAlteracoesLocais,
   enfileirar,
   enviarFoto,
   lerCache,
   lerFila,
   sincronizar,
-  urlFoto,
+  urlsFotos,
   baixarTudo,
 } from '@/lib/offline'
 
@@ -100,6 +101,24 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
       toast.success('Foto anexada')
     } catch {
       toast.error('Não foi possível enviar a foto')
+    }
+  }
+
+  async function apagarFotoDoItem(item: Item, nomeArquivo: string) {
+    if (!window.confirm('Apagar esta foto? Ela será removida do checklist.')) return
+    if (!online) {
+      toast.error('Apagar foto precisa de conexão', {
+        description: 'A remoção só é feita com sinal, para não desaparecer só neste aparelho.',
+      })
+      return
+    }
+    try {
+      await apagarFoto(item.id, nomeArquivo)
+      await baixarTudo()
+      carregarDoCache()
+      toast.success('Foto apagada')
+    } catch {
+      toast.error('Não foi possível apagar a foto')
     }
   }
 
@@ -251,12 +270,29 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
                       </div>
                     </div>
 
-                    {urlFoto(item) && (
-                      <img
-                        src={urlFoto(item) as string}
-                        alt={`Foto de ${item.nome}`}
-                        className="mt-2 h-20 w-20 rounded object-cover"
-                      />
+                    {urlsFotos(item).length > 0 && (
+                      <ul className="mt-2 flex flex-wrap gap-2">
+                        {urlsFotos(item).map((foto) => (
+                          <li key={foto.nome} className="relative">
+                            <a href={foto.original} target="_blank" rel="noreferrer">
+                              <img
+                                src={foto.miniatura}
+                                alt={`Foto de ${item.nome}`}
+                                className="h-20 w-20 rounded object-cover"
+                              />
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => apagarFotoDoItem(item, foto.nome)}
+                              className="absolute right-1 top-1 rounded-full bg-background/90 p-1 text-destructive shadow hover:bg-background"
+                              aria-label="Apagar foto"
+                              title="Apagar foto"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
                     )}
 
                     <Textarea

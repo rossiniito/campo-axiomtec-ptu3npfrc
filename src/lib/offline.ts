@@ -29,7 +29,8 @@ export type Item = {
   nome: string
   concluido: boolean
   observacao?: string
-  foto?: string
+  /** Nomes dos arquivos de foto do item (campo multi-arquivo no PocketBase). */
+  foto?: string[] | string
   concluido_em?: string
   ordem?: number
 }
@@ -165,15 +166,32 @@ export async function sincronizar(): Promise<{ enviados: number; restantes: numb
 /** Foto precisa de conexão: o arquivo não cabe na fila de texto. */
 export async function enviarFoto(itemId: string, arquivo: File) {
   const form = new FormData()
-  form.append('foto', arquivo)
+  // "foto+" acrescenta o arquivo às fotos já anexadas ao item.
+  form.append('foto+', arquivo)
   await pb.collection('itens').update(itemId, form)
 }
 
-export function urlFoto(item: Item): string | null {
-  if (!item.foto) return null
+/** Remove uma foto do item pelo nome do arquivo. Precisa de conexão. */
+export async function apagarFoto(itemId: string, nomeArquivo: string) {
+  // "foto-" remove só este arquivo do campo multi-arquivo.
+  await pb.collection('itens').update(itemId, { 'foto-': [nomeArquivo] })
+}
+
+/** Nomes dos arquivos de foto do item, sempre como lista (aceita o formato antigo de um único arquivo). */
+export function fotosDoItem(item: Item): string[] {
+  if (!item.foto) return []
+  return Array.isArray(item.foto) ? item.foto : [item.foto]
+}
+
+/** URL da miniatura de cada foto do item. */
+export function urlsFotos(item: Item): { nome: string; miniatura: string; original: string }[] {
   try {
-    return pb.files.getURL(item as never, item.foto, { thumb: '400x400' })
+    return fotosDoItem(item).map((nome) => ({
+      nome,
+      miniatura: pb.files.getURL(item as never, nome, { thumb: '400x400' }),
+      original: pb.files.getURL(item as never, nome),
+    }))
   } catch {
-    return null
+    return []
   }
 }
