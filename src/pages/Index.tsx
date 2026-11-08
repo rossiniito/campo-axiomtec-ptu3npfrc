@@ -13,13 +13,10 @@ const ROTULO_STATUS: Record<string, string> = {
   finalizado: 'Finalizado',
 }
 
+const CACHE_VAZIO: Cache = { obras: [], ambientes: [], itens: [], atualizadoEm: null }
+
 export default function Index() {
-  const [cache, setCache] = useState<Cache>({
-    obras: [],
-    ambientes: [],
-    itens: [],
-    atualizadoEm: null,
-  })
+  const [cache, setCache] = useState<Cache>(CACHE_VAZIO)
   const [obraSelecionada, setObraSelecionada] = useState<Obra | null>(null)
   const [online, setOnline] = useState(navigator.onLine)
   const [carregando, setCarregando] = useState(true)
@@ -31,12 +28,21 @@ export default function Index() {
     if (local.obras.length > 0) setCache(local)
     setPendentes(lerFila().length)
 
-    baixarTudo()
-      .then((dados) => setCache(dados))
-      .catch(() => {
+    // Ao abrir com sinal, primeiro esvazia a fila e só depois baixa,
+    // senão os dados do servidor sobrescrevem a alteração feita offline.
+    async function carregar() {
+      try {
+        if (navigator.onLine) await sincronizar()
+        const dados = await baixarTudo()
+        setCache(dados)
+        setPendentes(lerFila().length)
+      } catch {
         if (local.obras.length === 0) setOfflineNaPrimeiraCarga(true)
-      })
-      .finally(() => setCarregando(false))
+      } finally {
+        setCarregando(false)
+      }
+    }
+    carregar()
 
     const aoVoltarSinal = async () => {
       setOnline(true)
@@ -68,6 +74,18 @@ export default function Index() {
       })
     } catch {
       toast.error('Sem conexão para baixar agora')
+    }
+  }
+
+  async function enviarPendentes() {
+    try {
+      const r = await sincronizar()
+      const dados = await baixarTudo()
+      setCache(dados)
+      setPendentes(r.restantes)
+      toast.success(r.enviados > 0 ? `${r.enviados} enviada(s)` : 'Nada a enviar')
+    } catch {
+      toast.error('Sem conexão')
     }
   }
 
@@ -168,6 +186,13 @@ export default function Index() {
             </button>
           )
         })}
+
+        {pendentes > 0 && (
+          <Button className="w-full gap-2" onClick={enviarPendentes}>
+            <RefreshCw className="h-4 w-4" />
+            Enviar {pendentes} alteração(ões) pendente(s)
+          </Button>
+        )}
 
         {!carregando && cache.obras.length > 0 && (
           <Button variant="outline" className="w-full gap-2" onClick={prepararOffline}>

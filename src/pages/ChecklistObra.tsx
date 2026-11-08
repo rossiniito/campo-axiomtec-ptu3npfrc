@@ -10,6 +10,7 @@ import {
   type Ambiente,
   type Item,
   type Obra,
+  comAlteracoesLocais,
   enfileirar,
   enviarFoto,
   lerCache,
@@ -32,7 +33,9 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
   const [sincronizando, setSincronizando] = useState(false)
 
   function carregarDoCache() {
-    const cache = lerCache()
+    // comAlteracoesLocais reaplica a fila: sem isso, recarregar a página
+    // offline mostraria o dado antigo e a marcação sumiria da tela.
+    const cache = comAlteracoesLocais(lerCache())
     setAmbientes(cache.ambientes.filter((a) => a.obra === obra.id))
     setItens(cache.itens.filter((i) => i.obra === obra.id))
     setPendentes(lerFila().length)
@@ -103,10 +106,10 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
   async function sincronizarAgora() {
     setSincronizando(true)
     try {
-      await sincronizar()
+      const r = await sincronizar()
       await baixarTudo()
       carregarDoCache()
-      toast.success('Tudo sincronizado')
+      toast.success(r.enviados > 0 ? `${r.enviados} enviada(s)` : 'Tudo sincronizado')
     } catch {
       toast.error('Sem conexão para sincronizar')
     }
