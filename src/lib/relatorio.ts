@@ -2,7 +2,7 @@
    Usa jsPDF no navegador: sem servidor, o próprio celular do técnico gera o arquivo. */
 import { jsPDF } from 'jspdf'
 import pb from '@/lib/pocketbase/client'
-import type { Ambiente, Item, Obra } from '@/lib/offline'
+import { fotosDoItem, type Ambiente, type Item, type Obra } from '@/lib/offline'
 
 const AZUL: [number, number, number] = [31, 58, 95]
 const CINZA: [number, number, number] = [90, 100, 114]
@@ -25,12 +25,12 @@ type Contexto = {
   ambientes: Ambiente[]
   itens: Item[]
   assinaturas?: Assinaturas
-  numeroRelatorio?: string
 }
 
-const L = 18 // margem esquerda (mm)
-const R = 192 // limite direito (mm)
+const L = 18
+const R = 192
 const LARG = R - L
+const TITULO = 'Relatório de Implantação'
 
 function dataBR(iso?: string) {
   if (!iso) return '—'
@@ -56,32 +56,29 @@ function carregarImagem(src: string): Promise<HTMLImageElement> {
   })
 }
 
-/** Desenha o cabeçalho e o rodapé de cada página. */
-function moldura(doc: jsPDF, titulo: string, pagina: number, total: number) {
-  const w = doc.internal.pageSize.getWidth()
+/** Cabeçalho e rodapé de todas as páginas; chamada no fim, quando o total é conhecido. */
+function aplicarMolduras(doc: jsPDF) {
+  const total = doc.getNumberOfPages()
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p)
+    doc.setFillColor(...AZUL)
+    doc.rect(0, 0, 210, 12, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.text('AXIOMTEC  ·  AUTOMAÇÃO RESIDENCIAL', L, 7.8)
+    doc.setFont('helvetica', 'normal')
+    doc.text(TITULO, R, 7.8, { align: 'right' })
 
-  doc.setFillColor(...AZUL)
-  doc.rect(0, 0, w, 12, 'F')
-
-  doc.setTextColor(255, 255, 255)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  doc.text('AXIOMTEC  ·  AUTOMAÇÃO RESIDENCIAL', L, 7.8)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.text(titulo, R, 7.8, { align: 'right' })
-
-  doc.setDrawColor(...LINHA)
-  doc.setLineWidth(0.3)
-  doc.line(L, 282, R, 282)
-
-  doc.setTextColor(...CINZA)
-  doc.setFontSize(7)
-  doc.text('Documento gerado pelo sistema de campo AxiomTec', L, 287)
-  doc.text(`Página ${pagina} de ${total}`, R, 287, { align: 'right' })
-
-  doc.setTextColor(...TXT)
+    doc.setDrawColor(...LINHA)
+    doc.setLineWidth(0.3)
+    doc.line(L, 282, R, 282)
+    doc.setTextColor(...CINZA)
+    doc.setFontSize(7)
+    doc.text('Documento gerado pelo sistema de campo AxiomTec', L, 287)
+    doc.text(`Página ${p} de ${total}`, R, 287, { align: 'right' })
+    doc.setTextColor(...TXT)
+  }
 }
 
 function tituloSecao(doc: jsPDF, texto: string, y: number) {
@@ -93,14 +90,6 @@ function tituloSecao(doc: jsPDF, texto: string, y: number) {
   return y + 5
 }
 
-/** Caixa com fundo claro, usada para resumo. */
-function caixa(doc: jsPDF, y: number, altura: number) {
-  doc.setFillColor(...FUNDO)
-  doc.setDrawColor(...LINHA)
-  doc.setLineWidth(0.3)
-  doc.roundedRect(L, y, LARG, altura, 1.5, 1.5, 'FD')
-}
-
 export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; nome: string }> {
   const { obra, ambientes, itens, assinaturas } = ctx
 
@@ -110,17 +99,11 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
   const percentual = totalItens > 0 ? Math.round((concluidos / totalItens) * 100) : 0
   const agora = assinaturas?.dataAssinatura ?? new Date().toISOString()
 
-  // ---------- páginas: calculamos o total depois; usamos placeholder ----------
-  let pagina = 1
-  const titulo = 'Relatório de Implantação'
-
   // ===== CAPA / RESUMO =====
-  moldura(doc, titulo, pagina, 0)
-
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(20)
   doc.setTextColor(...AZUL)
-  doc.text('Relatório de Implantação', L, 30)
+  doc.text(TITULO, L, 30)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
@@ -132,7 +115,6 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
   )
   doc.setTextColor(...TXT)
 
-  // resumo
   const linhasResumo: [string, string][] = [
     ['Cliente', obra.cliente || obra.nome],
     ['Endereço', obra.endereco || '—'],
@@ -143,7 +125,11 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
     linhasResumo.push(['Responsável no local', assinaturas.nomeResponsavel])
 
   const alturaResumo = 6 + linhasResumo.length * 6
-  caixa(doc, 44, alturaResumo)
+  doc.setFillColor(...FUNDO)
+  doc.setDrawColor(...LINHA)
+  doc.setLineWidth(0.3)
+  doc.roundedRect(L, 44, LARG, alturaResumo, 1.5, 1.5, 'FD')
+
   let y = 49
   linhasResumo.forEach(([k, v]) => {
     doc.setFont('helvetica', 'bold')
@@ -193,8 +179,6 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
 
   // ===== CHECKLIST DETALHADO =====
   doc.addPage()
-  pagina += 1
-  moldura(doc, titulo, pagina, 0)
   y = 24
   y = tituloSecao(doc, 'Checklist detalhado', y)
   doc.setFont('helvetica', 'normal')
@@ -212,8 +196,6 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
 
     if (y > 258) {
       doc.addPage()
-      pagina += 1
-      moldura(doc, titulo, pagina, 0)
       y = 24
     }
 
@@ -238,18 +220,16 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
 
       if (y + altura > 270) {
         doc.addPage()
-        pagina += 1
-        moldura(doc, titulo, pagina, 0)
         y = 24
       }
 
-      // marcador
       doc.setDrawColor(...(item.concluido ? VERDE : LARANJA))
       doc.setLineWidth(0.6)
-      doc.rect(L + 1, y, 3, 3)
       if (item.concluido) {
         doc.setFillColor(...VERDE)
         doc.rect(L + 1, y, 3, 3, 'F')
+      } else {
+        doc.rect(L + 1, y, 3, 3)
       }
 
       doc.setFont('helvetica', 'normal')
@@ -257,7 +237,7 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
       doc.setTextColor(...TXT)
       doc.text(item.nome, L + 7, y + 2.6)
 
-      const qtdFotos = Array.isArray(item.foto) ? item.foto.length : item.foto ? 1 : 0
+      const qtdFotos = fotosDoItem(item).length
       if (qtdFotos > 0) {
         doc.setTextColor(...CINZA)
         doc.setFontSize(7)
@@ -269,7 +249,9 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
       if (linhasObs.length > 0) {
         doc.setTextColor(...CINZA)
         doc.setFontSize(7.5)
-        lerObs(doc, linhasObs, L + 7, y + 6.2)
+        linhasObs.forEach((linha, i) => {
+          doc.text(linha, L + 7, y + 6.2 + i * 3.6)
+        })
         doc.setTextColor(...TXT)
         doc.setFontSize(8.5)
       }
@@ -279,41 +261,33 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
   }
 
   // ===== REGISTRO FOTOGRÁFICO =====
-  const comFoto = itens.filter((i) => {
-    const f = Array.isArray(i.foto) ? i.foto : i.foto ? [i.foto] : []
-    return f.length > 0
-  })
+  const comFoto = itens.filter((i) => fotosDoItem(i).length > 0)
 
   if (comFoto.length > 0) {
     doc.addPage()
-    pagina += 1
-    moldura(doc, titulo, pagina, 0)
     y = 24
     y = tituloSecao(doc, 'Registro fotográfico', y)
 
     const LARG_FOTO = 54
-    const ALT_FOTO = 72
+    const ALT_FOTO = 54
     let col = 0
     let linhaY = y
 
     for (const item of comFoto) {
-      const fotos = Array.isArray(item.foto) ? item.foto : [item.foto as string]
-      for (const arquivo of fotos) {
+      for (const nomeArquivo of fotosDoItem(item)) {
         let url = ''
         try {
-          url = pb.files.getURL(item as never, arquivo, { thumb: '600x600' })
+          url = pb.files.getURL(item as never, nomeArquivo, { thumb: '600x600' })
         } catch {
           continue
         }
 
         if (col === 3) {
           col = 0
-          linhaY += ALT_FOTO + 20
+          linhaY += ALT_FOTO + 16
         }
-        if (linhaY + ALT_FOTO + 12 > 272) {
+        if (linhaY + ALT_FOTO + 10 > 274) {
           doc.addPage()
-          pagina += 1
-          moldura(doc, titulo, pagina, 0)
           linhaY = 24
           col = 0
         }
@@ -328,12 +302,10 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
             h = ALT_FOTO
             w = h / proporcao
           }
-          doc.addImage(img, 'JPEG', x + (LARG_FOTO - w) / 2, linhaY, w, h)
-          doc.setDrawColor(...LINHA)
-          doc.setLineWidth(0.2)
-          doc.rect(x, linhaY, LARG_FOTO, ALT_FOTO)
+          doc.addImage(img, 'JPEG', x + (LARG_FOTO - w) / 2, linhaY + (ALT_FOTO - h) / 2, w, h)
         } catch {
           doc.setDrawColor(...LINHA)
+          doc.setLineWidth(0.2)
           doc.rect(x, linhaY, LARG_FOTO, ALT_FOTO)
           doc.setFontSize(7)
           doc.setTextColor(...CINZA)
@@ -353,12 +325,10 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
     }
   }
 
-  // ===== ASSINATURAS =====
+  // ===== CONSIDERAÇÕES E ACEITE =====
   const temAssinatura = Boolean(assinaturas?.cliente || assinaturas?.tecnico)
   if (temAssinatura || assinaturas?.observacoes) {
     doc.addPage()
-    pagina += 1
-    moldura(doc, titulo, pagina, 0)
     y = 24
     y = tituloSecao(doc, 'Considerações e aceite', y)
 
@@ -370,20 +340,22 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
       y += linhas.length * 4.5 + 6
     }
 
-    // assinaturas lado a lado
     const larguraAss = 74
     const alturaAss = 26
-    const yAss = Math.max(y + 8, 200)
+    const yAss = Math.max(y + 10, 190)
 
-    for (const [indice, dados] of [
+    const blocos = [
       {
         rotulo: 'Assinatura do cliente',
         src: assinaturas?.cliente,
         nome: assinaturas?.nomeResponsavel,
       },
       { rotulo: 'Assinatura do técnico', src: assinaturas?.tecnico, nome: 'AxiomTec' },
-    ].entries()) {
-      const x = L + indice * (larguraAss + 12)
+    ]
+
+    for (let i = 0; i < blocos.length; i++) {
+      const dados = blocos[i]
+      const x = L + i * (larguraAss + 12)
       doc.setDrawColor(...LINHA)
       doc.setLineWidth(0.3)
       doc.line(x, yAss + alturaAss, x + larguraAss, yAss + alturaAss)
@@ -424,50 +396,18 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
     doc.setTextColor(...TXT)
   }
 
-  // aplica a numeração final em todas as páginas
-  const total = doc.getNumberOfPages()
-  for (let p = 1; p <= total; p++) {
-    doc.setPage(p)
-    doc.setFillColor(255, 255, 255)
-    doc.rect(0, 283, 210, 14, 'F')
-    doc.setDrawColor(...LINHA)
-    doc.setLineWidth(0.3)
-    doc.line(L, 282, R, 282)
-
-    if (p > 1) {
-      doc.setFillColor(...AZUL)
-      doc.rect(0, 0, 210, 12, 'F')
-      doc.setTextColor(255, 255, 255)
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(9)
-      doc.text('AXIOMTEC  ·  AUTOMAÇÃO RESIDENCIAL', L, 7.8)
-      doc.setFont('helvetica', 'normal')
-      doc.text(titulo, R, 7.8, { align: 'right' })
-    }
-
-    doc.setTextColor(...CINZA)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.text('Documento gerado pelo sistema de campo AxiomTec', L, 287)
-    doc.text(`Página ${p} de ${total}`, R, 287, { align: 'right' })
-  }
+  aplicarMolduras(doc)
 
   const nomeLimpo = obra.nome
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-zA-Z0-9]+/g, '-')
-  const nome = `relatorio-${nomeLimpo.toLowerCase()}-${dataBR(agora).replace(/\//g, '-')}.pdf`
+    .toLowerCase()
+  const nome = `relatorio-${nomeLimpo}-${dataBR(agora).replace(/\//g, '-')}.pdf`
   return { blob: doc.output('blob'), nome }
 }
 
-/** Escreve as observações quebrando linha por linha (jsPDF não faz isso sozinho). */
-function lerObs(doc: jsPDF, linhas: string[], x: number, y: number) {
-  linhas.forEach((linha, i) => {
-    doc.text(linha, x, y + i * 3.6)
-  })
-}
-
-/** Abre o PDF numa nova aba; se o navegador bloquear, força o download. */
+/** Dispara o download do PDF no aparelho. */
 export function baixarPDF(blob: Blob, nome: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

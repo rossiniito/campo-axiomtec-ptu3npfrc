@@ -1,5 +1,5 @@
 import pb from '@/lib/pocketbase/client'
-import type { Ambiente, Item, Obra } from '@/lib/offline'
+import { fotosDoItem, type Ambiente, type Item, type Obra } from '@/lib/offline'
 
 export type Relatorio = {
   id: string
@@ -44,6 +44,7 @@ function dataUrlParaArquivo(dataUrl: string, nome: string): File {
   return new File([bytes], nome, { type: mime })
 }
 
+/** Guarda no relatório exatamente o que foi apresentado ao cliente. */
 export function montarConteudo(
   obra: Obra,
   ambientes: Ambiente[],
@@ -71,7 +72,7 @@ export function montarConteudo(
           nome: i.nome,
           concluido: i.concluido,
           observacao: i.observacao,
-          fotos: Array.isArray(i.foto) ? i.foto.length : i.foto ? 1 : 0,
+          fotos: fotosDoItem(i).length,
         })),
     ),
     geradoEm: new Date().toISOString(),
@@ -97,7 +98,6 @@ export async function salvarRelatorio(params: {
     observacoes,
   } = params
 
-  const conteudo = montarConteudo(obra, ambientes, itens)
   const form = new FormData()
   form.append('obra', obra.id)
   form.append('titulo', `Relatório de Implantação — ${obra.nome}`)
@@ -106,7 +106,7 @@ export async function salvarRelatorio(params: {
   form.append('assinado_em', new Date().toISOString())
   form.append('total_itens', String(itens.length))
   form.append('itens_concluidos', String(itens.filter((i) => i.concluido).length))
-  form.append('conteudo', JSON.stringify(conteudo))
+  form.append('conteudo', JSON.stringify(montarConteudo(obra, ambientes, itens)))
 
   if (assinaturaCliente) {
     form.append(
@@ -127,7 +127,7 @@ export async function salvarRelatorio(params: {
 export function urlAssinatura(
   relatorio: Relatorio,
   campo: 'assinatura_cliente' | 'assinatura_tecnico',
-) {
+): string | null {
   const arquivo = relatorio[campo]
   if (!arquivo) return null
   try {

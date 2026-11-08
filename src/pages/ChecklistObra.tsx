@@ -4,20 +4,21 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
-import { ChevronLeft, Camera, WifiOff, RefreshCw, Check, FileText } from 'lucide-react'
+import { ChevronLeft, Camera, WifiOff, RefreshCw, Check, FileText, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import RelatorioEntrega from './RelatorioEntrega'
 import {
   type Ambiente,
   type Item,
   type Obra,
+  apagarFoto,
   comAlteracoesLocais,
   enfileirar,
   enviarFoto,
   lerCache,
   lerFila,
   sincronizar,
-  urlFoto,
+  urlsFotos,
   baixarTudo,
 } from '@/lib/offline'
 
@@ -102,6 +103,21 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
       toast.success('Foto anexada')
     } catch {
       toast.error('Não foi possível enviar a foto')
+    }
+  }
+
+  async function removerFoto(item: Item, nome: string) {
+    if (!online) {
+      toast.error('Remover foto precisa de conexão')
+      return
+    }
+    try {
+      await apagarFoto(item.id, nome)
+      await baixarTudo()
+      carregarDoCache()
+      toast.success('Foto removida')
+    } catch {
+      toast.error('Não foi possível remover')
     }
   }
 
@@ -210,62 +226,82 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
               </div>
 
               <ul className="space-y-2">
-                {doAmbiente.map((item) => (
-                  <li
-                    key={item.id}
-                    className={`rounded-lg border p-3 transition-colors ${
-                      item.concluido ? 'bg-muted/50' : 'bg-card'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        id={item.id}
-                        checked={item.concluido}
-                        onCheckedChange={(valor) => alternar(item, valor === true)}
-                        className="mt-0.5 h-5 w-5"
-                      />
-                      <label
-                        htmlFor={item.id}
-                        className={`flex-1 text-sm leading-snug ${
-                          item.concluido ? 'text-muted-foreground line-through' : ''
-                        }`}
-                      >
-                        {item.nome}
-                      </label>
-
-                      <label className="cursor-pointer text-muted-foreground hover:text-foreground">
-                        <Camera className="h-4 w-4" />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => {
-                            const arquivos = Array.from(e.target.files ?? [])
-                            arquivos.forEach((arquivo) => anexarFoto(item, arquivo))
-                          }}
+                {doAmbiente.map((item) => {
+                  const fotos = urlsFotos(item)
+                  return (
+                    <li
+                      key={item.id}
+                      className={`rounded-lg border p-3 transition-colors ${
+                        item.concluido ? 'bg-muted/50' : 'bg-card'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id={item.id}
+                          checked={item.concluido}
+                          onCheckedChange={(valor) => alternar(item, valor === true)}
+                          className="mt-0.5 h-5 w-5"
                         />
-                      </label>
-                    </div>
+                        <label
+                          htmlFor={item.id}
+                          className={`flex-1 text-sm leading-snug ${
+                            item.concluido ? 'text-muted-foreground line-through' : ''
+                          }`}
+                        >
+                          {item.nome}
+                        </label>
 
-                    {urlFoto(item) && (
-                      <img
-                        src={urlFoto(item) as string}
-                        alt={`Foto de ${item.nome}`}
-                        className="mt-2 h-20 w-20 rounded object-cover"
+                        <label className="cursor-pointer text-muted-foreground hover:text-foreground">
+                          <Camera className="h-4 w-4" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            multiple
+                            className="hidden"
+                            onChange={(e) => {
+                              const arquivos = Array.from(e.target.files ?? [])
+                              arquivos.forEach((arquivo) => anexarFoto(item, arquivo))
+                              e.target.value = ''
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      {fotos.length > 0 && (
+                        <ul className="mt-2 flex flex-wrap gap-2">
+                          {fotos.map((f) => (
+                            <li key={f.nome} className="group relative">
+                              <a href={f.original} target="_blank" rel="noreferrer">
+                                <img
+                                  src={f.miniatura}
+                                  alt={`Foto de ${item.nome}`}
+                                  className="h-20 w-20 rounded object-cover"
+                                />
+                              </a>
+                              <button
+                                type="button"
+                                aria-label="Remover foto"
+                                onClick={() => removerFoto(item, f.nome)}
+                                className="absolute right-0.5 top-0.5 rounded bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      <Textarea
+                        defaultValue={item.observacao ?? ''}
+                        placeholder="Observação (opcional)"
+                        rows={1}
+                        className="mt-2 min-h-0 resize-none border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0"
+                        onBlur={(e) => salvarObservacao(item, e.target.value)}
                       />
-                    )}
-
-                    <Textarea
-                      defaultValue={item.observacao ?? ''}
-                      placeholder="Observação (opcional)"
-                      rows={1}
-                      className="mt-2 min-h-0 resize-none border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0"
-                      onBlur={(e) => salvarObservacao(item, e.target.value)}
-                    />
-                  </li>
-                ))}
+                    </li>
+                  )
+                })}
               </ul>
             </section>
           )

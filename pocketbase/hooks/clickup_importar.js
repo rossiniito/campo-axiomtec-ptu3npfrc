@@ -1,22 +1,6 @@
 /* Importa o checklist de uma obra direto do ClickUp.
    Lê a estrutura real usada hoje: tarefa da obra -> checklists = ambientes
    -> itens = itens do checklist. Idempotente: casa por ambiente + nome. */
-
-type ClickUpItem = { name: string; resolved: boolean; orderindex: number }
-type ClickUpChecklist = { name: string; items: ClickUpItem[] }
-
-function tokensAleatorios(n: number) {
-  let s = ''
-  try {
-    const arr = new Uint8Array(n)
-    crypto.getRandomValues(arr)
-    for (let i = 0; i < n; i++) s += 'abcdefghijklmnopqrstuvwxyz0123456789'[arr[i] % 36]
-  } catch {
-    for (let i = 0; i < n; i++) s += 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 36)]
-  }
-  return s
-}
-
 routerAdd('POST', '/backend/v1/clickup/importar', (e) => {
   const body = e.requestInfo().body || {}
   const token = String(body.token || $secrets.get('CLICKUP_TOKEN') || '').trim()
@@ -24,7 +8,9 @@ routerAdd('POST', '/backend/v1/clickup/importar', (e) => {
   const obraId = String(body.obra_id || '').trim()
   const somentePendentes = body.somente_pendentes === true
 
-  if (!token) return e.json(400, { error: 'Informe o token do ClickUp ou configure o secret CLICKUP_TOKEN.' })
+  if (!token) {
+    return e.json(400, { error: 'Informe o token do ClickUp ou configure o secret CLICKUP_TOKEN.' })
+  }
   if (!taskId) return e.json(400, { error: 'Informe o id da tarefa do ClickUp (task_id).' })
   if (!obraId) return e.json(400, { error: 'Informe a obra destino (obra_id).' })
 
@@ -49,20 +35,21 @@ routerAdd('POST', '/backend/v1/clickup/importar', (e) => {
   }
 
   const tarefa = res.json || {}
-  const checklists = (tarefa.checklists || []) as ClickUpChecklist[]
+  const checklists = tarefa.checklists || []
   if (checklists.length === 0) {
     return e.json(422, {
       error: 'A tarefa "' + (tarefa.name || taskId) + '" não tem checklist no ClickUp.',
     })
   }
 
-  const ambientesCriados: string[] = []
-  const itensCriados: string[] = []
-  const itensIgnorados: string[] = []
+  const ambientesCriados = []
+  let itensCriados = 0
+  let itensIgnorados = 0
 
-  checklists.forEach((checklist, indiceAmbiente) => {
+  for (let i = 0; i < checklists.length; i++) {
+    const checklist = checklists[i]
+
     // um checklist do ClickUp vira um ambiente da obra
-    let ambiente
     const encontrados = $app.findRecordsByFilter(
       'ambientes',
       'obra = {:obra} && nome = {:nome}',
@@ -71,26 +58,32 @@ routerAdd('POST', '/backend/v1/clickup/importar', (e) => {
       0,
       { obra: obra.id, nome: checklist.name },
     )
+
+    let ambiente
     if (encontrados.length > 0) {
       ambiente = encontrados[0]
     } else {
       ambiente = new Record($app.findCollectionByNameOrId('ambientes'))
       ambiente.set('obra', obra.id)
       ambiente.set('nome', checklist.name)
-      ambiente.set('ordem', indiceAmbiente)
+      ambiente.set('ordem', i)
       $app.save(ambiente)
       ambientesCriados.push(checklist.name)
     }
 
-    const itens = (checklist.items || []).slice().sort(function (a, b) {
+    const itensDoChecklist = (checklist.items || []).slice()
+    itensDoChecklist.sort(function (a, b) {
       return (a.orderindex || 0) - (b.orderindex || 0)
     })
 
-    itens.forEach((item, indiceItem) => {
+    for (let j = 0; j < itensDoChecklist.length; j++) {
+      const item = itensDoChecklist[j]
+
       if (somentePendentes && item.resolved) {
-        itensIgnorados.push(item.name)
-        return
+        itensIgnorados++
+        continue
       }
+
       // a chave é ambiente + nome: "Spot Mini" existe em dois ambientes
       const existentes = $app.findRecordsByFilter(
         'itens',
@@ -101,32 +94,28 @@ routerAdd('POST', '/backend/v1/clickup/importar', (e) => {
         { ambiente: ambiente.id, nome: item.name },
       )
       if (existentes.length > 0) {
-        itensIgnorados.push(item.name)
-        return
+        itensIgnorados++
+        continue
       }
 
       const registro = new Record($app.findCollectionByNameOrId('itens'))
       registro.set('obra', obra.id)
       registro.set('ambiente', ambiente.id)
       registro.set('nome', item.name)
-      registro.set('concluido', Boolean(item.resolved))
-      registro.set('ordem', indiceItem)
-      if (item.resolved) {
+      registro.set('concluido', item.resolved === true)
+      registro.set('ordem', j)
+      if (item.resolved === true) {
         registro.set('concluido_em', new Date().toISOString())
       }
       $app.save(registro)
-      itensCriados.push(item.name)
-    })
-  })
+      itensCriados++
+    }
+  }
 
   return e.json(200, {
     tarefa: tarefa.name || taskId,
     ambientes_criados: ambientesCriados,
-    itens_criados: itensCriados.length,
-    itens_ignorados: itensIgnorados.length,
-    detalhe: {
-      ambientes: ambientesCriados,
-      criados: itensCriados,
-    },
+    itens_criados: itensCriados,
+    itens_ignorados: itensIgnorados,
   })
 })
