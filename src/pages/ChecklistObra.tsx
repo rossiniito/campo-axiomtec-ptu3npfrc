@@ -4,20 +4,20 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
-import { ChevronLeft, Camera, ImageIcon, WifiOff, RefreshCw, Check, Trash2 } from 'lucide-react'
+import { ChevronLeft, Camera, WifiOff, RefreshCw, Check, FileText } from 'lucide-react'
 import { toast } from 'sonner'
+import RelatorioEntrega from './RelatorioEntrega'
 import {
   type Ambiente,
   type Item,
   type Obra,
-  apagarFoto,
   comAlteracoesLocais,
   enfileirar,
   enviarFoto,
   lerCache,
   lerFila,
   sincronizar,
-  urlsFotos,
+  urlFoto,
   baixarTudo,
 } from '@/lib/offline'
 
@@ -32,6 +32,7 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
   const [online, setOnline] = useState(navigator.onLine)
   const [pendentes, setPendentes] = useState(0)
   const [sincronizando, setSincronizando] = useState(false)
+  const [mostrarRelatorio, setMostrarRelatorio] = useState(false)
 
   function carregarDoCache() {
     // comAlteracoesLocais reaplica a fila: sem isso, recarregar a página
@@ -87,50 +88,20 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
     setPendentes(lerFila().length)
   }
 
-  async function anexarFotos(item: Item, arquivos: File[]) {
-    if (arquivos.length === 0) return
+  async function anexarFoto(item: Item, arquivo: File) {
     if (!online) {
-      toast.error(arquivos.length > 1 ? 'Fotos precisam de conexão' : 'Foto precisa de conexão', {
+      toast.error('Foto precisa de conexão', {
         description: 'O texto e o checklist funcionam offline; a foto só sobe com sinal.',
       })
       return
     }
-    let enviadas = 0
-    for (const arquivo of arquivos) {
-      try {
-        await enviarFoto(item.id, arquivo)
-        enviadas++
-      } catch {
-        toast.error('Não foi possível enviar uma das fotos', {
-          description: arquivo.name,
-        })
-      }
-    }
-    if (enviadas === 0) return
     try {
+      await enviarFoto(item.id, arquivo)
       await baixarTudo()
       carregarDoCache()
+      toast.success('Foto anexada')
     } catch {
-      /* o envio já foi feito; a próxima sincronização atualiza a tela */
-    }
-    toast.success(enviadas === 1 ? 'Foto anexada' : `${enviadas} fotos anexadas`)
-  }
-
-  async function apagarFotoDoItem(item: Item, nomeArquivo: string) {
-    if (!window.confirm('Apagar esta foto? Ela será removida do checklist.')) return
-    if (!online) {
-      toast.error('Apagar foto precisa de conexão', {
-        description: 'A remoção só é feita com sinal, para não desaparecer só neste aparelho.',
-      })
-      return
-    }
-    try {
-      await apagarFoto(item.id, nomeArquivo)
-      await baixarTudo()
-      carregarDoCache()
-      toast.success('Foto apagada')
-    } catch {
-      toast.error('Não foi possível apagar a foto')
+      toast.error('Não foi possível enviar a foto')
     }
   }
 
@@ -151,6 +122,18 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
   const prontos = itens.filter((i) => i.concluido).length
   const percentual = total > 0 ? Math.round((prontos / total) * 100) : 0
 
+  if (mostrarRelatorio) {
+    return (
+      <RelatorioEntrega
+        obra={obra}
+        onVoltar={() => {
+          setMostrarRelatorio(false)
+          carregarDoCache()
+        }}
+      />
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-10 border-b bg-background px-4 py-3">
@@ -164,6 +147,15 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
               {obra.arquiteta ? `Arq. ${obra.arquiteta}` : obra.endereco}
             </p>
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1"
+            onClick={() => setMostrarRelatorio(true)}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Relatório
+          </Button>
         </div>
 
         <div className="mt-3 flex items-center gap-3">
@@ -241,71 +233,28 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
                         {item.nome}
                       </label>
 
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        {/* Tirar foto: capture="environment" abre a câmera direto no celular */}
-                        <label
-                          className="cursor-pointer text-muted-foreground hover:text-foreground"
-                          title="Tirar foto"
-                        >
-                          <Camera className="h-4 w-4" />
-                          <input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            className="hidden"
-                            aria-label="Tirar foto"
-                            onChange={(e) => {
-                              const arquivo = e.target.files?.[0]
-                              if (arquivo) anexarFotos(item, [arquivo])
-                              e.target.value = ''
-                            }}
-                          />
-                        </label>
-                        {/* Escolher da galeria: sem capture, o celular abre o seletor de fotos */}
-                        <label
-                          className="cursor-pointer text-muted-foreground hover:text-foreground"
-                          title="Escolher da galeria"
-                        >
-                          <ImageIcon className="h-4 w-4" />
-                          <input
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            className="hidden"
-                            aria-label="Escolher da galeria"
-                            onChange={(e) => {
-                              const arquivos = Array.from(e.target.files ?? [])
-                              anexarFotos(item, arquivos)
-                              e.target.value = ''
-                            }}
-                          />
-                        </label>
-                      </div>
+                      <label className="cursor-pointer text-muted-foreground hover:text-foreground">
+                        <Camera className="h-4 w-4" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            const arquivos = Array.from(e.target.files ?? [])
+                            arquivos.forEach((arquivo) => anexarFoto(item, arquivo))
+                          }}
+                        />
+                      </label>
                     </div>
 
-                    {urlsFotos(item).length > 0 && (
-                      <ul className="mt-2 flex flex-wrap gap-2">
-                        {urlsFotos(item).map((foto) => (
-                          <li key={foto.nome} className="relative">
-                            <a href={foto.original} target="_blank" rel="noreferrer">
-                              <img
-                                src={foto.miniatura}
-                                alt={`Foto de ${item.nome}`}
-                                className="h-20 w-20 rounded object-cover"
-                              />
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => apagarFotoDoItem(item, foto.nome)}
-                              className="absolute right-1 top-1 rounded-full bg-background/90 p-1 text-destructive shadow hover:bg-background"
-                              aria-label="Apagar foto"
-                              title="Apagar foto"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                    {urlFoto(item) && (
+                      <img
+                        src={urlFoto(item) as string}
+                        alt={`Foto de ${item.nome}`}
+                        className="mt-2 h-20 w-20 rounded object-cover"
+                      />
                     )}
 
                     <Textarea
