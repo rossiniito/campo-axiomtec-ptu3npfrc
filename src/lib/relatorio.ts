@@ -56,7 +56,18 @@ function carregarImagem(src: string): Promise<HTMLImageElement> {
   })
 }
 
-/** Cabeçalho e rodapé de todas as páginas; chamada no fim, quando o total é conhecido. */
+/** Reduz a foto num canvas antes de embutir: sem isso o PDF passa de 4 MB. */
+function comprimir(img: HTMLImageElement, ladoMax = 700): string {
+  const escala = Math.min(1, ladoMax / Math.max(img.width, img.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(img.width * escala)
+  canvas.height = Math.round(img.height * escala)
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return ''
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  return canvas.toDataURL('image/jpeg', 0.72)
+}
+
 function aplicarMolduras(doc: jsPDF) {
   const total = doc.getNumberOfPages()
   for (let p = 1; p <= total; p++) {
@@ -140,7 +151,6 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
     y += 6
   })
 
-  // tabela por ambiente
   y = 44 + alturaResumo + 12
   y = tituloSecao(doc, 'Situação por ambiente', y)
 
@@ -295,6 +305,7 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
         const x = L + col * (LARG_FOTO + 8)
         try {
           const img = await carregarImagem(url)
+          const comprimida = comprimir(img)
           const proporcao = img.height / img.width
           let w = LARG_FOTO
           let h = w * proporcao
@@ -302,7 +313,16 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
             h = ALT_FOTO
             w = h / proporcao
           }
-          doc.addImage(img, 'JPEG', x + (LARG_FOTO - w) / 2, linhaY + (ALT_FOTO - h) / 2, w, h)
+          doc.addImage(
+            comprimida,
+            'JPEG',
+            x + (LARG_FOTO - w) / 2,
+            linhaY + (ALT_FOTO - h) / 2,
+            w,
+            h,
+            undefined,
+            'FAST',
+          )
         } catch {
           doc.setDrawColor(...LINHA)
           doc.setLineWidth(0.2)
