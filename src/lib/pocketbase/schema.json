@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-09T02:02:21.330Z",
+  "generatedAt": "2026-11-09T03:02:26.544Z",
   "collections": [
     {
       "name": "users",
@@ -504,11 +504,97 @@
             "onCreate",
             "onUpdate"
           ]
+        },
+        {
+          "name": "modelo",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "modelos"
+        },
+        {
+          "name": "checklist_criado_clickup_em",
+          "type": "date",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
         "CREATE UNIQUE INDEX idx_ordens_numero ON ordens (numero)",
         "CREATE UNIQUE INDEX idx_ordens_clickup ON ordens (clickup_task_id) WHERE clickup_task_id != \"\""
+      ]
+    },
+    {
+      "name": "modelos",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "descricao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "categoria",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "automacao",
+            "av",
+            "redes",
+            "cftv",
+            "video_porteiro",
+            "outro"
+          ]
+        },
+        {
+          "name": "ativo",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estrutura",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_modelos_nome ON modelos (nome)"
       ]
     }
   ]

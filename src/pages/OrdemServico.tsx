@@ -15,6 +15,7 @@ import {
   LogIn,
   LogOut,
   RefreshCw,
+  Sparkles,
   WifiOff,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -26,6 +27,7 @@ import {
   registrarCheckout,
   atualizarOrdem,
 } from '@/services/ordens'
+import { type Modelo, aplicarModeloNaOS, listarModelos, totalDeItens } from '@/services/modelos'
 import {
   type Ambiente,
   type Item,
@@ -54,6 +56,8 @@ export default function OrdemServico({ ordem, onVoltar, onAtualizada }: Props) {
   const [tecnico, setTecnico] = useState(ordem.tecnico ?? '')
   const [pendencia, setPendencia] = useState(ordem.pendencia_cliente ?? '')
   const [salvando, setSalvando] = useState(false)
+  const [modelos, setModelos] = useState<Modelo[]>([])
+  const [aplicando, setAplicando] = useState<string | null>(null)
 
   function carregar() {
     const cache = comAlteracoesLocais(lerCache())
@@ -89,6 +93,14 @@ export default function OrdemServico({ ordem, onVoltar, onAtualizada }: Props) {
       window.removeEventListener('offline', () => setOnline(false))
     }
   }, [ordem.id])
+
+  // busca os modelos só quando a OS está vazia (o técnico vai precisar escolher)
+  useEffect(() => {
+    if (itens.length > 0) return
+    listarModelos()
+      .then(setModelos)
+      .catch(() => undefined)
+  }, [itens.length])
 
   const total = itens.length
   const prontos = itens.filter((i) => i.concluido).length
@@ -154,6 +166,40 @@ export default function OrdemServico({ ordem, onVoltar, onAtualizada }: Props) {
     } catch {
       toast.error('Sem conexão')
     }
+  }
+
+  async function aplicarModelo(modelo: Modelo) {
+    setAplicando(modelo.id)
+    try {
+      const r = await aplicarModeloNaOS(ordem.id, modelo.id)
+      await baixarTudo()
+      carregar()
+      onAtualizada({ ...ordem, modelo: modelo.id })
+
+      if (r.clickup === 'criado') {
+        toast.success('Modelo aplicado e checklist criado no ClickUp', {
+          description: `${r.ambientes} ambientes · ${r.itens} itens`,
+        })
+      } else if (r.clickup === 'sem_token') {
+        toast.warning('Checklist criado no app', {
+          description: 'No ClickUp não foi criado: falta configurar o token.',
+        })
+      } else if (r.clickup === 'sem_tarefa_vinculada') {
+        toast.success('Modelo aplicado', {
+          description:
+            'Esta OS não está ligada a uma tarefa do ClickUp, então o checklist ficou só aqui.',
+        })
+      } else if (r.clickup === 'parcial') {
+        toast.warning('Aplicado com falhas no ClickUp', {
+          description: r.avisos.join(' · '),
+        })
+      } else {
+        toast.success(`${r.itens} itens criados`)
+      }
+    } catch (e) {
+      toast.error('Não foi possível aplicar o modelo', { description: String(e) })
+    }
+    setAplicando(null)
   }
 
   if (mostrarRelatorio) {
@@ -240,6 +286,50 @@ export default function OrdemServico({ ordem, onVoltar, onAtualizada }: Props) {
       </header>
 
       <main className="mx-auto max-w-2xl space-y-4 px-4 py-4">
+        {total === 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Sparkles className="h-4 w-4" /> Escolha o checklist desta OS
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                A tarefa no ClickUp veio sem checklist. Aplique um modelo e ele cria os itens aqui e
+                o checklist na tarefa do ClickUp.
+              </p>
+              {modelos.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum modelo cadastrado ainda. Saia desta OS e toque na engrenagem da tela
+                  inicial para montar o primeiro.
+                </p>
+              )}
+              {modelos.map((modelo) => (
+                <Button
+                  key={modelo.id}
+                  variant="outline"
+                  className="h-auto w-full justify-between gap-2 py-2"
+                  onClick={() => aplicarModelo(modelo)}
+                  disabled={aplicando !== null}
+                >
+                  <span className="min-w-0 text-left">
+                    <span className="block truncate text-sm font-medium">{modelo.nome}</span>
+                    <span className="block text-[11px] text-muted-foreground">
+                      {modelo.estrutura?.length ?? 0} ambientes ·{' '}
+                      {totalDeItens(modelo.estrutura ?? [])} itens
+                    </span>
+                  </span>
+                  {aplicando === modelo.id ? (
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 shrink-0" />
+                  )}
+                </Button>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Registro do dia</CardTitle>
@@ -343,18 +433,6 @@ export default function OrdemServico({ ordem, onVoltar, onAtualizada }: Props) {
             )}
           </CardContent>
         </Card>
-
-        {total === 0 && (
-          <Card className="border-dashed">
-            <CardHeader>
-              <CardTitle className="text-base">Esta OS não tem checklist</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              A tarefa no ClickUp não tem checklist, e é dele que o app monta os itens. Você ainda
-              pode registrar o dia, a pendência e o aceite do cliente.
-            </CardContent>
-          </Card>
-        )}
 
         {ambientes.map((ambiente) => {
           const doAmbiente = itens

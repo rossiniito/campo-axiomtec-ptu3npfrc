@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ChevronRight, CloudDownload, Loader2, RefreshCw, WifiOff } from 'lucide-react'
+import { ChevronRight, CloudDownload, Loader2, RefreshCw, Settings2, WifiOff } from 'lucide-react'
 import { toast } from 'sonner'
 import OrdemServico from './OrdemServico'
+import Modelos from './Modelos'
 import { type Ordem, ROTULO_STATUS, listarOrdens, puxarDoClickUp } from '@/services/ordens'
 import {
   type Ambiente,
@@ -21,6 +22,7 @@ export default function Index() {
   const [itens, setItens] = useState<Item[]>([])
   const [ambientes, setAmbientes] = useState<Ambiente[]>([])
   const [ordemAberta, setOrdemAberta] = useState<Ordem | null>(null)
+  const [verModelos, setVerModelos] = useState(false)
   const [online, setOnline] = useState(navigator.onLine)
   const [carregando, setCarregando] = useState(true)
   const [buscando, setBuscando] = useState(false)
@@ -83,7 +85,9 @@ export default function Index() {
       await recarregar()
       toast.success(
         r.os_criadas > 0 ? `${r.os_criadas} OS nova(s) do ClickUp` : 'Nenhuma OS nova',
-        { description: `${r.ja_existiam} já estavam aqui.` },
+        {
+          description: `${r.ja_existiam} já estavam aqui.`,
+        },
       )
     } catch (e) {
       toast.error('Não foi possível buscar no ClickUp', { description: String(e) })
@@ -99,6 +103,10 @@ export default function Index() {
     } catch {
       toast.error('Sem conexão')
     }
+  }
+
+  if (verModelos) {
+    return <Modelos />
   }
 
   if (ordemAberta) {
@@ -121,10 +129,22 @@ export default function Index() {
     <div className="min-h-screen bg-background">
       <header className="border-b px-4 py-5">
         <div className="mx-auto max-w-2xl">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            AxiomTec · Campo
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold">Minhas ordens de serviço</h1>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                AxiomTec · Campo
+              </p>
+              <h1 className="mt-1 text-2xl font-semibold">Minhas ordens de serviço</h1>
+            </div>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setVerModelos(true)}
+              aria-label="Modelos de checklist"
+            >
+              <Settings2 className="h-5 w-5" />
+            </Button>
+          </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {online ? (
               <Badge variant="secondary">Online</Badge>
@@ -221,6 +241,11 @@ export default function Index() {
                 <Badge variant="secondary" className="text-xs">
                   {ROTULO_STATUS[ordem.status ?? 'aberta']}
                 </Badge>
+                {daOrdem.length === 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    sem checklist
+                  </Badge>
+                )}
                 {ordem.sincronizada_em && (
                   <Badge variant="outline" className="text-xs">
                     sincronizada
@@ -229,11 +254,6 @@ export default function Index() {
                 {ordem.ultimo_erro_sync && (
                   <Badge variant="destructive" className="text-xs">
                     erro de sync
-                  </Badge>
-                )}
-                {!ordem.checkin_em && (
-                  <Badge variant="outline" className="text-xs">
-                    sem entrada
                   </Badge>
                 )}
               </div>
