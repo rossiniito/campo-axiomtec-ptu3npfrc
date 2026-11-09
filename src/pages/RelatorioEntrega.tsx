@@ -4,26 +4,23 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Checkbox } from '@/components/ui/checkbox'
 import { ChevronLeft, Download, FileText, Loader2, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import Assinatura from '@/components/Assinatura'
 import { type Ambiente, type Item, type Obra, lerCache } from '@/lib/offline'
 import { baixarPDF, gerarRelatorioPDF } from '@/lib/relatorio'
-import {
-  type Relatorio,
-  listarRelatorios,
-  marcarEnviado,
-  salvarRelatorio,
-  urlAssinatura,
-} from '@/services/relatorios'
+import { salvarRelatorio, urlAssinatura, type Relatorio } from '@/services/relatorios'
+import { listarRelatorios, marcarEnviado } from '@/services/relatorios'
 
 type Props = {
   obra: Obra
+  /** Quando vem de uma OS, o relatório cobre só os itens dela. */
+  ordemServico?: string
+  numeroOS?: string
   onVoltar: () => void
 }
 
-export default function RelatorioEntrega({ obra, onVoltar }: Props) {
+export default function RelatorioEntrega({ obra, ordemServico, numeroOS, onVoltar }: Props) {
   const [ambientes, setAmbientes] = useState<Ambiente[]>([])
   const [itens, setItens] = useState<Item[]>([])
   const [assinaturaCliente, setAssinaturaCliente] = useState<string | null>(null)
@@ -31,24 +28,28 @@ export default function RelatorioEntrega({ obra, onVoltar }: Props) {
   const [nomeResponsavel, setNomeResponsavel] = useState('')
   const [observacoes, setObservacoes] = useState('')
   const [gerando, setGerando] = useState(false)
-  const [salvando, setSalvando] = useState(false)
   const [incluirFotos, setIncluirFotos] = useState(true)
   const [historico, setHistorico] = useState<Relatorio[]>([])
 
   useEffect(() => {
     const cache = lerCache()
-    setAmbientes(cache.ambientes.filter((a) => a.obra === obra.id))
-    setItens(cache.itens.filter((i) => i.obra === obra.id))
+    // se veio de uma OS, só os itens dela entram no relatório
+    const meusItens = ordemServico
+      ? cache.itens.filter((i) => i.ordem_servico === ordemServico)
+      : cache.itens.filter((i) => i.obra === obra.id)
+    const idsAmb = new Set(meusItens.map((i) => i.ambiente))
+    setItens(meusItens)
+    setAmbientes(cache.ambientes.filter((a) => idsAmb.has(a.id)))
     listarRelatorios(obra.id)
       .then(setHistorico)
       .catch(() => undefined)
-  }, [obra.id])
+  }, [obra.id, ordemServico])
 
   const total = itens.length
   const concluidos = itens.filter((i) => i.concluido).length
   const pendentes = total - concluidos
 
-  async function gerar(salvar = true) {
+  async function gerar() {
     if (!assinaturaCliente) {
       toast.error('Falta a assinatura do cliente', {
         description: 'O aceite é o que dá validade ao relatório.',
@@ -73,48 +74,20 @@ export default function RelatorioEntrega({ obra, onVoltar }: Props) {
       })
       baixarPDF(blob, nome)
 
-      if (salvar) {
-        setSalvando(true)
-        const salvo = await salvarRelatorio({
-          obra,
-          ambientes,
-          itens,
-          assinaturaCliente,
-          assinaturaTecnico,
-          nomeResponsavel,
-          observacoes,
-        })
-        setHistorico((atual) => [salvo, ...atual])
-        setSalvando(false)
-      }
+      const salvo = await salvarRelatorio({
+        obra,
+        ordemServico,
+        ambientes,
+        itens,
+        assinaturaCliente,
+        assinaturaTecnico,
+        nomeResponsavel,
+        observacoes,
+      })
+      setHistorico((atual) => [salvo, ...atual])
       toast.success('Relatório gerado', { description: 'O PDF foi baixado no seu aparelho.' })
     } catch (e) {
       toast.error('Não foi possível gerar o PDF', { description: String(e) })
-    }
-    setGerando(false)
-  }
-
-  async function reemitir(rel: Relatorio) {
-    const cliente = urlAssinatura(rel, 'assinatura_cliente')
-    const tecnico = urlAssinatura(rel, 'assinatura_tecnico')
-    setGerando(true)
-    try {
-      const { blob, nome } = await gerarRelatorioPDF({
-        obra,
-        ambientes,
-        itens,
-        assinaturas: {
-          cliente,
-          tecnico,
-          nomeResponsavel: rel.nome_responsavel,
-          observacoes: rel.observacoes,
-          dataAssinatura: rel.assinado_em,
-        },
-      })
-      baixarPDF(blob, nome)
-      toast.success('Relatório reemitido')
-    } catch {
-      toast.error('Não foi possível reemitir')
     }
     setGerando(false)
   }
@@ -127,7 +100,9 @@ export default function RelatorioEntrega({ obra, onVoltar }: Props) {
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-semibold">Relatório de entrega</h1>
+            <h1 className="truncate text-lg font-semibold">
+              {numeroOS ? `Relatório ${numeroOS}` : 'Relatório de entrega'}
+            </h1>
             <p className="truncate text-xs text-muted-foreground">{obra.nome}</p>
           </div>
         </div>
@@ -162,23 +137,21 @@ export default function RelatorioEntrega({ obra, onVoltar }: Props) {
           />
         </div>
 
-        <div className="flex items-start gap-2">
-          <Checkbox
-            id="fotos"
+        <label className="flex items-start gap-2 text-sm leading-snug">
+          <input
+            type="checkbox"
             checked={incluirFotos}
-            onCheckedChange={(v) => setIncluirFotos(v === true)}
-            className="mt-0.5"
+            onChange={(e) => setIncluirFotos(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-primary"
           />
-          <label htmlFor="fotos" className="text-sm leading-snug">
-            Incluir registro fotográfico no PDF
-          </label>
-        </div>
+          Incluir registro fotográfico no PDF
+        </label>
 
         <Assinatura rotulo="Assinatura do cliente" onChange={setAssinaturaCliente} altura={150} />
         <Assinatura rotulo="Assinatura do técnico" onChange={setAssinaturaTecnico} altura={130} />
 
-        <Button className="w-full gap-2" onClick={() => gerar(true)} disabled={gerando || salvando}>
-          {gerando || salvando ? (
+        <Button className="w-full gap-2" onClick={gerar} disabled={gerando}>
+          {gerando ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Download className="h-4 w-4" />
@@ -188,7 +161,7 @@ export default function RelatorioEntrega({ obra, onVoltar }: Props) {
 
         {historico.length > 0 && (
           <section className="space-y-2 pt-2">
-            <h2 className="text-sm font-semibold">Relatórios já emitidos</h2>
+            <h2 className="text-sm font-semibold">Relatórios já emitidos nesta obra</h2>
             <ul className="space-y-2">
               {historico.map((rel) => {
                 const data = rel.assinado_em || rel.created
@@ -223,8 +196,8 @@ export default function RelatorioEntrega({ obra, onVoltar }: Props) {
                           size="sm"
                           variant="ghost"
                           className="h-7 px-2 text-xs"
-                          onClick={() => reemitir(rel)}
-                          disabled={gerando}
+                          disabled
+                          title="Reemissão volta na próxima etapa"
                         >
                           PDF
                         </Button>

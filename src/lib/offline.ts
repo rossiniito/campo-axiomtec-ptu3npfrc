@@ -32,7 +32,12 @@ export type Item = {
   /** Nomes dos arquivos de foto do item (campo multi-arquivo no PocketBase). */
   foto?: string[] | string
   concluido_em?: string
+  /** Posição do item dentro do ambiente (campo número). */
   ordem?: number
+  /** Relação com a OS a que o item pertence. */
+  ordem_servico?: string
+  clickup_item_id?: string
+  clickup_checklist_id?: string
 }
 
 export type Cache = {

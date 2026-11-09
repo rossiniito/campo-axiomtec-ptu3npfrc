@@ -2,42 +2,56 @@ import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ChevronRight, WifiOff, RefreshCw, Download } from 'lucide-react'
+import { ChevronRight, CloudDownload, Loader2, RefreshCw, WifiOff } from 'lucide-react'
 import { toast } from 'sonner'
-import ChecklistObra from './ChecklistObra'
-import { type Cache, type Obra, baixarTudo, lerCache, lerFila, sincronizar } from '@/lib/offline'
-
-const ROTULO_STATUS: Record<string, string> = {
-  aguardando: 'Aguardando',
-  executando: 'Executando',
-  finalizado: 'Finalizado',
-}
-
-const CACHE_VAZIO: Cache = { obras: [], ambientes: [], itens: [], atualizadoEm: null }
+import OrdemServico from './OrdemServico'
+import { type Ordem, ROTULO_STATUS, listarOrdens, puxarDoClickUp } from '@/services/ordens'
+import {
+  type Ambiente,
+  type Item,
+  baixarTudo,
+  comAlteracoesLocais,
+  lerCache,
+  lerFila,
+  sincronizar,
+} from '@/lib/offline'
 
 export default function Index() {
-  const [cache, setCache] = useState<Cache>(CACHE_VAZIO)
-  const [obraSelecionada, setObraSelecionada] = useState<Obra | null>(null)
+  const [ordens, setOrdens] = useState<Ordem[]>([])
+  const [itens, setItens] = useState<Item[]>([])
+  const [ambientes, setAmbientes] = useState<Ambiente[]>([])
+  const [ordemAberta, setOrdemAberta] = useState<Ordem | null>(null)
   const [online, setOnline] = useState(navigator.onLine)
   const [carregando, setCarregando] = useState(true)
-  const [offlineNaPrimeiraCarga, setOfflineNaPrimeiraCarga] = useState(false)
+  const [buscando, setBuscando] = useState(false)
   const [pendentes, setPendentes] = useState(0)
+  const [atualizadoEm, setAtualizadoEm] = useState<string | null>(null)
+
+  function lerLocal() {
+    const cache = comAlteracoesLocais(lerCache())
+    setItens(cache.itens)
+    setAmbientes(cache.ambientes)
+    setAtualizadoEm(cache.atualizadoEm)
+    setPendentes(lerFila().length)
+  }
+
+  async function recarregar() {
+    const cache = await baixarTudo()
+    setItens(cache.itens)
+    setAmbientes(cache.ambientes)
+    setAtualizadoEm(cache.atualizadoEm)
+    setPendentes(lerFila().length)
+    setOrdens(await listarOrdens())
+  }
 
   useEffect(() => {
-    const local = lerCache()
-    if (local.obras.length > 0) setCache(local)
-    setPendentes(lerFila().length)
-
-    // Ao abrir com sinal, primeiro esvazia a fila e só depois baixa,
-    // senão os dados do servidor sobrescrevem a alteração feita offline.
+    lerLocal()
     async function carregar() {
       try {
         if (navigator.onLine) await sincronizar()
-        const dados = await baixarTudo()
-        setCache(dados)
-        setPendentes(lerFila().length)
+        await recarregar()
       } catch {
-        if (local.obras.length === 0) setOfflineNaPrimeiraCarga(true)
+        /* segue com o que está no aparelho */
       } finally {
         setCarregando(false)
       }
@@ -48,15 +62,12 @@ export default function Index() {
       setOnline(true)
       try {
         await sincronizar()
-        const dados = await baixarTudo()
-        setCache(dados)
-        setPendentes(lerFila().length)
+        await recarregar()
       } catch {
-        /* segue com o cache */
+        /* ignora */
       }
     }
     const aoPerderSinal = () => setOnline(false)
-
     window.addEventListener('online', aoVoltarSinal)
     window.addEventListener('offline', aoPerderSinal)
     return () => {
@@ -65,32 +76,45 @@ export default function Index() {
     }
   }, [])
 
-  async function prepararOffline() {
+  async function buscarNoClickUp() {
+    setBuscando(true)
     try {
-      const dados = await baixarTudo()
-      setCache(dados)
-      toast.success('Obras baixadas neste aparelho', {
-        description: 'Você pode fechar o app: o checklist abre sem internet.',
-      })
-    } catch {
-      toast.error('Sem conexão para baixar agora')
+      const r = await puxarDoClickUp()
+      await recarregar()
+      toast.success(
+        r.os_criadas > 0 ? `${r.os_criadas} OS nova(s) do ClickUp` : 'Nenhuma OS nova',
+        { description: `${r.ja_existiam} já estavam aqui.` },
+      )
+    } catch (e) {
+      toast.error('Não foi possível buscar no ClickUp', { description: String(e) })
     }
+    setBuscando(false)
   }
 
   async function enviarPendentes() {
     try {
       const r = await sincronizar()
-      const dados = await baixarTudo()
-      setCache(dados)
-      setPendentes(r.restantes)
+      await recarregar()
       toast.success(r.enviados > 0 ? `${r.enviados} enviada(s)` : 'Nada a enviar')
     } catch {
       toast.error('Sem conexão')
     }
   }
 
-  if (obraSelecionada) {
-    return <ChecklistObra obra={obraSelecionada} onVoltar={() => setObraSelecionada(null)} />
+  if (ordemAberta) {
+    return (
+      <OrdemServico
+        ordem={ordemAberta}
+        onVoltar={() => {
+          setOrdemAberta(null)
+          recarregar().catch(() => undefined)
+        }}
+        onAtualizada={(o) => {
+          setOrdemAberta(o)
+          setOrdens((atual) => atual.map((x) => (x.id === o.id ? { ...x, ...o } : x)))
+        }}
+      />
+    )
   }
 
   return (
@@ -100,7 +124,7 @@ export default function Index() {
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             AxiomTec · Campo
           </p>
-          <h1 className="mt-1 text-2xl font-semibold">Minhas obras</h1>
+          <h1 className="mt-1 text-2xl font-semibold">Minhas ordens de serviço</h1>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {online ? (
               <Badge variant="secondary">Online</Badge>
@@ -110,10 +134,10 @@ export default function Index() {
               </Badge>
             )}
             {pendentes > 0 && <Badge variant="outline">{pendentes} pendentes de envio</Badge>}
-            {cache.atualizadoEm && (
+            {atualizadoEm && (
               <span className="text-xs text-muted-foreground">
                 Atualizado em{' '}
-                {new Date(cache.atualizadoEm).toLocaleString('pt-BR', {
+                {new Date(atualizadoEm).toLocaleString('pt-BR', {
                   day: '2-digit',
                   month: '2-digit',
                   hour: '2-digit',
@@ -126,47 +150,61 @@ export default function Index() {
       </header>
 
       <main className="mx-auto max-w-2xl space-y-3 px-4 py-4">
-        {carregando && cache.obras.length === 0 && (
-          <p className="py-8 text-center text-sm text-muted-foreground">Carregando obras…</p>
+        <Button
+          variant="outline"
+          className="w-full gap-2"
+          onClick={buscarNoClickUp}
+          disabled={buscando}
+        >
+          {buscando ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <CloudDownload className="h-4 w-4" />
+          )}
+          Buscar ordens novas no ClickUp
+        </Button>
+
+        {carregando && ordens.length === 0 && (
+          <p className="py-8 text-center text-sm text-muted-foreground">Carregando ordens…</p>
         )}
 
-        {offlineNaPrimeiraCarga && (
+        {!carregando && ordens.length === 0 && (
           <Card className="border-dashed">
             <CardHeader>
-              <CardTitle className="text-base">Primeira carga sem internet</CardTitle>
+              <CardTitle className="text-base">Nenhuma OS ainda</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>
-                Abra o app uma vez com sinal para baixar as obras neste aparelho. Depois disso ele
-                funciona no subsolo.
-              </p>
-              <Button size="sm" onClick={() => window.location.reload()}>
-                Tentar novamente
-              </Button>
+            <CardContent className="text-sm text-muted-foreground">
+              Toque em “Buscar ordens novas no ClickUp” para trazer as tarefas da lista Instalação.
             </CardContent>
           </Card>
         )}
 
-        {cache.obras.map((obra) => {
-          const doObra = cache.itens.filter((i) => i.obra === obra.id)
-          const prontos = doObra.filter((i) => i.concluido).length
-          const percentual = doObra.length > 0 ? Math.round((prontos / doObra.length) * 100) : 0
+        {ordens.map((ordem) => {
+          const daOrdem = itens.filter((i) => i.ordem_servico === ordem.id)
+          const prontos = daOrdem.filter((i) => i.concluido).length
+          const percentual = daOrdem.length > 0 ? Math.round((prontos / daOrdem.length) * 100) : 0
+          const nome = ordem.expand?.obra?.nome ?? ordem.descricao ?? ''
 
           return (
             <button
-              key={obra.id}
-              onClick={() => setObraSelecionada(obra)}
+              key={ordem.id}
+              onClick={() => setOrdemAberta(ordem)}
               className="w-full rounded-xl border bg-card p-4 text-left transition-colors hover:bg-accent/50"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-semibold">{obra.nome}</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {ordem.numero}
+                  </p>
+                  <p className="truncate font-semibold">{nome}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {obra.arquiteta ? `Arq. ${obra.arquiteta}` : obra.endereco}
+                    {ordem.clickup_status || 'sem status no ClickUp'}
+                    {ordem.checkin_em ? ' · entrada registrada' : ''}
                   </p>
                 </div>
                 <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
               </div>
+
               <div className="mt-3 flex items-center gap-3">
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                   <div
@@ -175,13 +213,29 @@ export default function Index() {
                   />
                 </div>
                 <span className="text-xs tabular-nums text-muted-foreground">
-                  {prontos}/{doObra.length}
+                  {prontos}/{daOrdem.length}
                 </span>
               </div>
-              <div className="mt-2 flex items-center gap-2">
+
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Badge variant="secondary" className="text-xs">
-                  {ROTULO_STATUS[obra.status ?? ''] ?? obra.status}
+                  {ROTULO_STATUS[ordem.status ?? 'aberta']}
                 </Badge>
+                {ordem.sincronizada_em && (
+                  <Badge variant="outline" className="text-xs">
+                    sincronizada
+                  </Badge>
+                )}
+                {ordem.ultimo_erro_sync && (
+                  <Badge variant="destructive" className="text-xs">
+                    erro de sync
+                  </Badge>
+                )}
+                {!ordem.checkin_em && (
+                  <Badge variant="outline" className="text-xs">
+                    sem entrada
+                  </Badge>
+                )}
               </div>
             </button>
           )
@@ -194,20 +248,12 @@ export default function Index() {
           </Button>
         )}
 
-        {!carregando && cache.obras.length > 0 && (
-          <Button variant="outline" className="w-full gap-2" onClick={prepararOffline}>
-            <Download className="h-4 w-4" />
-            Baixar obras para uso offline
-          </Button>
-        )}
-      </main>
-
-      <footer className="mx-auto max-w-2xl px-4 pb-8">
-        <p className="flex items-center justify-center gap-1 text-center text-xs text-muted-foreground">
-          <RefreshCw className="h-3 w-3" />
-          Protótipo local-first · alterações sem sinal ficam no aparelho e sobem sozinhas
+        <p className="pt-2 text-center text-xs text-muted-foreground">
+          {ambientes.length > 0
+            ? `${ambientes.length} ambientes no aparelho · funciona sem sinal`
+            : 'Abra uma vez com sinal para baixar as ordens neste aparelho'}
         </p>
-      </footer>
+      </main>
     </div>
   )
 }

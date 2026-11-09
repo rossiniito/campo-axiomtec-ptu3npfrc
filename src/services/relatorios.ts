@@ -4,6 +4,7 @@ import { fotosDoItem, type Ambiente, type Item, type Obra } from '@/lib/offline'
 export type Relatorio = {
   id: string
   obra: string
+  ordem_servico?: string
   titulo?: string
   nome_responsavel?: string
   observacoes?: string
@@ -81,6 +82,7 @@ export function montarConteudo(
 
 export async function salvarRelatorio(params: {
   obra: Obra
+  ordemServico?: string
   ambientes: Ambiente[]
   itens: Item[]
   assinaturaCliente: string | null
@@ -90,6 +92,7 @@ export async function salvarRelatorio(params: {
 }): Promise<Relatorio> {
   const {
     obra,
+    ordemServico,
     ambientes,
     itens,
     assinaturaCliente,
@@ -100,6 +103,7 @@ export async function salvarRelatorio(params: {
 
   const form = new FormData()
   form.append('obra', obra.id)
+  if (ordemServico) form.append('ordem_servico', ordemServico)
   form.append('titulo', `Relatório de Implantação — ${obra.nome}`)
   form.append('nome_responsavel', nomeResponsavel)
   form.append('observacoes', observacoes)
