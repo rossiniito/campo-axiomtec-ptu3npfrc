@@ -53,14 +53,11 @@ export async function excluirOrcamento(id: string) {
 export async function aprovarOrcamento(
   id: string,
 ): Promise<{ orcamento: string; obra: string; os: string; os_id: string }> {
-  const res = await fetch(`${pb.baseUrl}/backend/v1/orcamento/aprovar`, {
+  // pb.send leva o token da sessão: a rota exige login
+  return (await pb.send('/backend/v1/orcamento/aprovar', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ orcamento_id: id }),
-  })
-  const dados = await res.json()
-  if (!res.ok) throw new Error(dados?.error ?? `Falha ao aprovar (HTTP ${res.status})`)
-  return dados
+    body: { orcamento_id: id },
+  })) as { orcamento: string; obra: string; os: string; os_id: string }
 }
 
 export type ResumoComercial = {

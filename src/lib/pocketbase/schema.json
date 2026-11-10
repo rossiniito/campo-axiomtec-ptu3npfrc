@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-11-10T22:13:35.845Z",
+  "generatedAt": "2026-11-10T23:26:59.047Z",
   "collections": [
     {
       "name": "users",
       "type": "auth",
       "apiRules": {
-        "list": "id = @request.auth.id",
-        "view": "id = @request.auth.id",
-        "create": "",
-        "update": "id = @request.auth.id",
-        "delete": "id = @request.auth.id"
+        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || id = @request.auth.id)",
+        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || id = @request.auth.id)",
+        "create": "@request.auth.perfil = \"gestor\"",
+        "update": "@request.auth.id != \"\" && (id = @request.auth.id || @request.auth.perfil = \"gestor\") && @request.body.perfil:changed = false",
+        "delete": "@request.auth.perfil = \"gestor\" && id != @request.auth.id"
       },
       "fields": [
         {
@@ -42,6 +42,16 @@
             "onCreate",
             "onUpdate"
           ]
+        },
+        {
+          "name": "perfil",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "gestor",
+            "tecnico"
+          ]
         }
       ],
       "indexes": [
@@ -53,11 +63,11 @@
       "name": "obras",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || tecnicos ?= @request.auth.id)",
+        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || tecnicos ?= @request.auth.id)",
+        "create": "@request.auth.perfil = \"gestor\"",
+        "update": "@request.auth.perfil = \"gestor\"",
+        "delete": "@request.auth.perfil = \"gestor\""
       },
       "fields": [
         {
@@ -113,6 +123,13 @@
             "onCreate",
             "onUpdate"
           ]
+        },
+        {
+          "name": "tecnicos",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
         }
       ],
       "indexes": []
@@ -121,11 +138,11 @@
       "name": "ambientes",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "create": "@request.auth.perfil = \"gestor\"",
+        "update": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "delete": "@request.auth.perfil = \"gestor\""
       },
       "fields": [
         {
@@ -173,11 +190,11 @@
       "name": "itens",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "create": "@request.auth.perfil = \"gestor\"",
+        "update": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "delete": "@request.auth.perfil = \"gestor\""
       },
       "fields": [
         {
@@ -275,11 +292,11 @@
       "name": "relatorios",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "create": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "update": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "delete": "@request.auth.perfil = \"gestor\""
       },
       "fields": [
         {
@@ -382,11 +399,11 @@
       "name": "ordens",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "create": "@request.auth.perfil = \"gestor\"",
+        "update": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "delete": "@request.auth.perfil = \"gestor\""
       },
       "fields": [
         {
@@ -528,11 +545,11 @@
       "name": "modelos",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.id != \"\"",
+        "view": "@request.auth.id != \"\"",
+        "create": "@request.auth.perfil = \"gestor\"",
+        "update": "@request.auth.perfil = \"gestor\"",
+        "delete": "@request.auth.perfil = \"gestor\""
       },
       "fields": [
         {
@@ -601,11 +618,11 @@
       "name": "orcamentos",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.perfil = \"gestor\"",
+        "view": "@request.auth.perfil = \"gestor\"",
+        "create": "@request.auth.perfil = \"gestor\"",
+        "update": "@request.auth.perfil = \"gestor\"",
+        "delete": "@request.auth.perfil = \"gestor\""
       },
       "fields": [
         {

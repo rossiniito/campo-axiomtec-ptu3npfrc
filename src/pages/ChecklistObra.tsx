@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
 import { ChevronLeft, Camera, WifiOff, RefreshCw, Check, FileText, Trash2 } from 'lucide-react'
+import { garantirTokenArquivo } from '@/lib/files'
 import { toast } from 'sonner'
 import RelatorioEntrega from './RelatorioEntrega'
 import {
@@ -34,6 +35,8 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
   const [pendentes, setPendentes] = useState(0)
   const [sincronizando, setSincronizando] = useState(false)
   const [mostrarRelatorio, setMostrarRelatorio] = useState(false)
+  // muda quando o token de arquivo chega: as fotos protegidas recarregam
+  const [tokenArquivo, setTokenArquivo] = useState(0)
 
   function carregarDoCache() {
     // comAlteracoesLocais reaplica a fila: sem isso, recarregar a página
@@ -42,6 +45,8 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
     setAmbientes(cache.ambientes.filter((a) => a.obra === obra.id))
     setItens(cache.itens.filter((i) => i.obra === obra.id))
     setPendentes(lerFila().length)
+    // foto é arquivo protegido: sem token a imagem não abre
+    garantirTokenArquivo().then(() => setTokenArquivo((n) => n + 1))
   }
 
   useEffect(() => {
@@ -227,7 +232,8 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
 
               <ul className="space-y-2">
                 {doAmbiente.map((item) => {
-                  const fotos = urlsFotos(item)
+                  // tokenArquivo força recalcular as URLs quando o token chega
+                  const fotos = tokenArquivo >= 0 ? urlsFotos(item) : []
                   return (
                     <li
                       key={item.id}

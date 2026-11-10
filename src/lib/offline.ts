@@ -2,6 +2,7 @@
    O PocketBase não tem sync offline nativo, então as escritas feitas sem
    conexão ficam nesta fila e são reenviadas quando o sinal volta. */
 import pb from '@/lib/pocketbase/client'
+import { urlArquivo } from '@/lib/files'
 
 const CACHE_KEY = 'campo:cache:v1'
 const QUEUE_KEY = 'campo:fila:v1'
@@ -188,13 +189,13 @@ export function fotosDoItem(item: Item): string[] {
   return Array.isArray(item.foto) ? item.foto : [item.foto]
 }
 
-/** URL da miniatura de cada foto do item. */
+/** URL da miniatura de cada foto do item (com token, porque o arquivo é protegido). */
 export function urlsFotos(item: Item): { nome: string; miniatura: string; original: string }[] {
   try {
     return fotosDoItem(item).map((nome) => ({
       nome,
-      miniatura: pb.files.getURL(item as never, nome, { thumb: '400x400' }),
-      original: pb.files.getURL(item as never, nome),
+      miniatura: urlArquivo(item as never, nome, { thumb: '400x400' }),
+      original: urlArquivo(item as never, nome),
     }))
   } catch {
     return []

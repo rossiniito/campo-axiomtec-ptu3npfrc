@@ -83,12 +83,20 @@ export async function aplicarModeloNaOS(
     | 'nao_solicitado'
   avisos: string[]
 }> {
-  const res = await fetch(`${pb.baseUrl}/backend/v1/os/aplicar-modelo`, {
+  // pb.send leva o token da sessão: a rota exige login
+  return (await pb.send('/backend/v1/os/aplicar-modelo', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ordem_id: ordemId, modelo_id: modeloId }),
-  })
-  const dados = await res.json()
-  if (!res.ok) throw new Error(dados?.error ?? `Falha ao aplicar (HTTP ${res.status})`)
-  return dados
+    body: { ordem_id: ordemId, modelo_id: modeloId },
+  })) as {
+    ambientes: number
+    itens: number
+    clickup:
+      | 'criado'
+      | 'parcial'
+      | 'sem_token'
+      | 'sem_tarefa_vinculada'
+      | 'ja_existia'
+      | 'nao_solicitado'
+    avisos: string[]
+  }
 }

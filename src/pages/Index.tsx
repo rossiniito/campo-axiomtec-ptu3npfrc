@@ -2,11 +2,22 @@ import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ChevronRight, CloudDownload, Loader2, RefreshCw, Settings2, WifiOff } from 'lucide-react'
+import {
+  ChevronRight,
+  CloudDownload,
+  Loader2,
+  LogOut,
+  RefreshCw,
+  Settings2,
+  Users,
+  WifiOff,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import OrdemServico from './OrdemServico'
 import Modelos from './Modelos'
 import Comercial from './Comercial'
+import Equipe from './Equipe'
+import { useAuth } from '@/lib/auth'
 import { type Ordem, ROTULO_STATUS, listarOrdens, puxarDoClickUp } from '@/services/ordens'
 import {
   type Ambiente,
@@ -21,12 +32,14 @@ import {
 type Aba = 'comercial' | 'campo'
 
 export default function Index() {
-  const [aba, setAba] = useState<Aba>('comercial')
+  const { usuario, ehGestor, sair } = useAuth()
+  const [aba, setAba] = useState<Aba>(ehGestor ? 'comercial' : 'campo')
   const [ordens, setOrdens] = useState<Ordem[]>([])
   const [itens, setItens] = useState<Item[]>([])
   const [ambientes, setAmbientes] = useState<Ambiente[]>([])
   const [ordemAberta, setOrdemAberta] = useState<Ordem | null>(null)
   const [verModelos, setVerModelos] = useState(false)
+  const [verEquipe, setVerEquipe] = useState(false)
   const [online, setOnline] = useState(navigator.onLine)
   const [carregando, setCarregando] = useState(true)
   const [buscando, setBuscando] = useState(false)
@@ -89,9 +102,7 @@ export default function Index() {
       await recarregar()
       toast.success(
         r.os_criadas > 0 ? `${r.os_criadas} OS nova(s) do ClickUp` : 'Nenhuma OS nova',
-        {
-          description: `${r.ja_existiam} já estavam aqui.`,
-        },
+        { description: `${r.ja_existiam} já estavam aqui.` },
       )
     } catch (e) {
       toast.error('Não foi possível buscar no ClickUp', { description: String(e) })
@@ -107,6 +118,10 @@ export default function Index() {
     } catch {
       toast.error('Sem conexão')
     }
+  }
+
+  if (verEquipe && ehGestor) {
+    return <Equipe onVoltar={() => setVerEquipe(false)} />
   }
 
   if (verModelos) {
@@ -134,49 +149,71 @@ export default function Index() {
       <header className="border-b px-4 py-4">
         <div className="mx-auto max-w-2xl">
           <div className="flex items-start justify-between gap-2">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 AxiomTec
               </p>
               <h1 className="text-xl font-semibold">
-                {aba === 'comercial' ? 'Comercial' : 'Campo'}
+                {!ehGestor ? 'Minhas obras' : aba === 'comercial' ? 'Comercial' : 'Campo'}
               </h1>
+              <p className="truncate text-xs text-muted-foreground">
+                {usuario?.name || usuario?.email}
+                {ehGestor ? ' · gestor' : ' · técnico'}
+              </p>
             </div>
-            {aba === 'campo' && (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setVerModelos(true)}
-                aria-label="Modelos de checklist"
-              >
-                <Settings2 className="h-5 w-5" />
+
+            <div className="flex shrink-0 items-center">
+              {ehGestor && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setVerEquipe(true)}
+                  aria-label="Equipe e acessos"
+                >
+                  <Users className="h-5 w-5" />
+                </Button>
+              )}
+              {aba === 'campo' && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setVerModelos(true)}
+                  aria-label="Modelos de checklist"
+                >
+                  <Settings2 className="h-5 w-5" />
+                </Button>
+              )}
+              <Button size="icon" variant="ghost" onClick={sair} aria-label="Sair">
+                <LogOut className="h-5 w-5" />
               </Button>
-            )}
+            </div>
           </div>
 
-          {/* abas */}
-          <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-            <button
-              onClick={() => setAba('comercial')}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                aba === 'comercial' ? 'bg-background shadow' : 'text-muted-foreground'
-              }`}
-            >
-              Comercial
-            </button>
-            <button
-              onClick={() => setAba('campo')}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                aba === 'campo' ? 'bg-background shadow' : 'text-muted-foreground'
-              }`}
-            >
-              Campo
-            </button>
-          </div>
+          {/* o técnico não tem aba comercial: só existe a lista das obras dele */}
+          {ehGestor && (
+            <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+              <button
+                onClick={() => setAba('comercial')}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  aba === 'comercial' ? 'bg-background shadow' : 'text-muted-foreground'
+                }`}
+              >
+                Comercial
+              </button>
+              <button
+                onClick={() => setAba('campo')}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  aba === 'campo' ? 'bg-background shadow' : 'text-muted-foreground'
+                }`}
+              >
+                Campo
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
-      {aba === 'comercial' ? (
+      {ehGestor && aba === 'comercial' ? (
         <Comercial onVoltar={() => setAba('campo')} onAtualizar={recarregar} />
       ) : (
         <div>
@@ -205,19 +242,21 @@ export default function Index() {
           </div>
 
           <main className="mx-auto max-w-2xl space-y-3 px-4 py-4">
-            <Button
-              variant="outline"
-              className="w-full gap-2"
-              onClick={buscarNoClickUp}
-              disabled={buscando}
-            >
-              {buscando ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <CloudDownload className="h-4 w-4" />
-              )}
-              Buscar ordens novas no ClickUp
-            </Button>
+            {ehGestor && (
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={buscarNoClickUp}
+                disabled={buscando}
+              >
+                {buscando ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CloudDownload className="h-4 w-4" />
+                )}
+                Buscar ordens novas no ClickUp
+              </Button>
+            )}
 
             {carregando && ordens.length === 0 && (
               <p className="py-8 text-center text-sm text-muted-foreground">Carregando ordens…</p>
@@ -226,11 +265,14 @@ export default function Index() {
             {!carregando && ordens.length === 0 && (
               <Card className="border-dashed">
                 <CardHeader>
-                  <CardTitle className="text-base">Nenhuma OS ainda</CardTitle>
+                  <CardTitle className="text-base">
+                    {ehGestor ? 'Nenhuma OS ainda' : 'Nenhuma obra atribuída a você'}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground">
-                  Aprove um orçamento na aba Comercial, ou toque em “Buscar ordens novas no
-                  ClickUp”.
+                  {ehGestor
+                    ? 'Aprove um orçamento na aba Comercial, ou toque em “Buscar ordens novas no ClickUp”.'
+                    : 'Quando o gestor marcar você como responsável por uma obra, ela aparece aqui.'}
                 </CardContent>
               </Card>
             )}

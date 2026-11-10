@@ -66,12 +66,11 @@ export async function puxarDoClickUp(): Promise<{
   ja_existiam: number
   detalhe?: unknown[]
 }> {
-  const res = await fetch(`${pb.baseUrl}/backend/v1/os/puxar`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
-  })
-  const dados = await res.json()
-  if (!res.ok) throw new Error(dados?.error ?? `Falha ao buscar (HTTP ${res.status})`)
-  return dados
+  // pb.send leva o token da sessão: a rota exige login
+  return (await pb.send('/backend/v1/os/puxar', { method: 'POST', body: {} })) as {
+    lidas: number
+    os_criadas: number
+    ja_existiam: number
+    detalhe?: unknown[]
+  }
 }

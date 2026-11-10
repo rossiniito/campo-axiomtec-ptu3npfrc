@@ -1,7 +1,7 @@
 /* Geração do relatório de entrega em PDF, com timbre AxiomTec.
    Usa jsPDF no navegador: sem servidor, o próprio celular do técnico gera o arquivo. */
 import { jsPDF } from 'jspdf'
-import pb from '@/lib/pocketbase/client'
+import { garantirTokenArquivo, urlArquivo } from '@/lib/files'
 import { fotosDoItem, type Ambiente, type Item, type Obra } from '@/lib/offline'
 
 const AZUL: [number, number, number] = [31, 58, 95]
@@ -103,6 +103,9 @@ function tituloSecao(doc: jsPDF, texto: string, y: number) {
 
 export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; nome: string }> {
   const { obra, ambientes, itens, assinaturas } = ctx
+
+  // sem o token as fotos protegidas não carregam no PDF
+  await garantirTokenArquivo()
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true })
   const totalItens = itens.length
@@ -285,12 +288,8 @@ export async function gerarRelatorioPDF(ctx: Contexto): Promise<{ blob: Blob; no
 
     for (const item of comFoto) {
       for (const nomeArquivo of fotosDoItem(item)) {
-        let url = ''
-        try {
-          url = pb.files.getURL(item as never, nomeArquivo, { thumb: '600x600' })
-        } catch {
-          continue
-        }
+        const url = urlArquivo(item as never, nomeArquivo, { thumb: '600x600' })
+        if (!url) continue
 
         if (col === 3) {
           col = 0

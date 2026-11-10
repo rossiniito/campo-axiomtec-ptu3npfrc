@@ -1,4 +1,5 @@
 import pb from '@/lib/pocketbase/client'
+import { urlArquivo } from '@/lib/files'
 import { fotosDoItem, type Ambiente, type Item, type Obra } from '@/lib/offline'
 
 export type Relatorio = {
@@ -134,11 +135,7 @@ export function urlAssinatura(
 ): string | null {
   const arquivo = relatorio[campo]
   if (!arquivo) return null
-  try {
-    return pb.files.getURL(relatorio as never, arquivo)
-  } catch {
-    return null
-  }
+  return urlArquivo(relatorio as never, arquivo) || null
 }
 
 export async function listarRelatorios(obraId: string): Promise<Relatorio[]> {
