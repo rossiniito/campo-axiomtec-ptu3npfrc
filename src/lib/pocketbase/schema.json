@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-10T23:26:59.047Z",
+  "generatedAt": "2026-11-10T23:29:40.362Z",
   "collections": [
     {
       "name": "users",
@@ -63,8 +63,8 @@
       "name": "obras",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || tecnicos ?= @request.auth.id)",
-        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || tecnicos ?= @request.auth.id)",
+        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || tecnicos ~ @request.auth.id)",
+        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || tecnicos ~ @request.auth.id)",
         "create": "@request.auth.perfil = \"gestor\"",
         "update": "@request.auth.perfil = \"gestor\"",
         "delete": "@request.auth.perfil = \"gestor\""
@@ -138,10 +138,10 @@
       "name": "ambientes",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
-        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
+        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
         "create": "@request.auth.perfil = \"gestor\"",
-        "update": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "update": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
         "delete": "@request.auth.perfil = \"gestor\""
       },
       "fields": [
@@ -190,10 +190,10 @@
       "name": "itens",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
-        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
+        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
         "create": "@request.auth.perfil = \"gestor\"",
-        "update": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "update": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
         "delete": "@request.auth.perfil = \"gestor\""
       },
       "fields": [
@@ -292,10 +292,10 @@
       "name": "relatorios",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
-        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
-        "create": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
-        "update": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
+        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
+        "create": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
+        "update": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
         "delete": "@request.auth.perfil = \"gestor\""
       },
       "fields": [
@@ -399,10 +399,10 @@
       "name": "ordens",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
-        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
+        "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
         "create": "@request.auth.perfil = \"gestor\"",
-        "update": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ?= @request.auth.id)",
+        "update": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
         "delete": "@request.auth.perfil = \"gestor\""
       },
       "fields": [
