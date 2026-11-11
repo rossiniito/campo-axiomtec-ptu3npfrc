@@ -173,7 +173,8 @@ export default function Index() {
                   <Users className="h-5 w-5" />
                 </Button>
               )}
-              {aba === 'campo' && (
+              {/* modelos são do gestor: o técnico só executa o checklist */}
+              {aba === 'campo' && ehGestor && (
                 <Button
                   size="icon"
                   variant="ghost"
