@@ -7,16 +7,20 @@ import {
   CloudDownload,
   Loader2,
   LogOut,
+  Package,
   RefreshCw,
   Settings2,
   Users,
   WifiOff,
+  Wrench,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import OrdemServico from './OrdemServico'
 import Modelos from './Modelos'
 import Comercial from './Comercial'
 import Equipe from './Equipe'
+import Chamados from './Chamados'
+import Equipamentos from './Equipamentos'
 import { useAuth } from '@/lib/auth'
 import { type Ordem, ROTULO_STATUS, listarOrdens, puxarDoClickUp } from '@/services/ordens'
 import {
@@ -40,6 +44,8 @@ export default function Index() {
   const [ordemAberta, setOrdemAberta] = useState<Ordem | null>(null)
   const [verModelos, setVerModelos] = useState(false)
   const [verEquipe, setVerEquipe] = useState(false)
+  const [verChamados, setVerChamados] = useState(false)
+  const [verEquipamentos, setVerEquipamentos] = useState(false)
   const [online, setOnline] = useState(navigator.onLine)
   const [carregando, setCarregando] = useState(true)
   const [buscando, setBuscando] = useState(false)
@@ -124,6 +130,14 @@ export default function Index() {
     return <Equipe onVoltar={() => setVerEquipe(false)} />
   }
 
+  if (verChamados) {
+    return <Chamados onVoltar={() => setVerChamados(false)} />
+  }
+
+  if (verEquipamentos) {
+    return <Equipamentos onVoltar={() => setVerEquipamentos(false)} />
+  }
+
   if (verModelos) {
     return <Modelos />
   }
@@ -163,6 +177,22 @@ export default function Index() {
             </div>
 
             <div className="flex shrink-0 items-center">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setVerChamados(true)}
+                aria-label="Chamados de pós-venda"
+              >
+                <Wrench className="h-5 w-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setVerEquipamentos(true)}
+                aria-label="Equipamentos e garantia"
+              >
+                <Package className="h-5 w-5" />
+              </Button>
               {ehGestor && (
                 <Button
                   size="icon"
