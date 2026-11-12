@@ -10,7 +10,9 @@ import {
   Package,
   RefreshCw,
   Settings2,
+  TrendingUp,
   Users,
+  Wallet,
   WifiOff,
   Wrench,
 } from 'lucide-react'
@@ -21,6 +23,8 @@ import Comercial from './Comercial'
 import Equipe from './Equipe'
 import Chamados from './Chamados'
 import Equipamentos from './Equipamentos'
+import Despesas from './Despesas'
+import Financeiro from './Financeiro'
 import { useAuth } from '@/lib/auth'
 import { type Ordem, ROTULO_STATUS, listarOrdens, puxarDoClickUp } from '@/services/ordens'
 import {
@@ -46,6 +50,8 @@ export default function Index() {
   const [verEquipe, setVerEquipe] = useState(false)
   const [verChamados, setVerChamados] = useState(false)
   const [verEquipamentos, setVerEquipamentos] = useState(false)
+  const [verDespesas, setVerDespesas] = useState(false)
+  const [verFinanceiro, setVerFinanceiro] = useState(false)
   const [online, setOnline] = useState(navigator.onLine)
   const [carregando, setCarregando] = useState(true)
   const [buscando, setBuscando] = useState(false)
@@ -134,6 +140,25 @@ export default function Index() {
     return <Chamados onVoltar={() => setVerChamados(false)} />
   }
 
+  if (verDespesas) {
+    return (
+      <Despesas
+        onVoltar={() => setVerDespesas(false)}
+        usuarioId={usuario?.id ?? ''}
+        ehGestor={ehGestor}
+      />
+    )
+  }
+
+  if (verFinanceiro && ehGestor) {
+    return (
+      <Financeiro
+        onVoltar={() => setVerFinanceiro(false)}
+        onDespesas={() => setVerDespesas(true)}
+      />
+    )
+  }
+
   if (verEquipamentos) {
     return <Equipamentos onVoltar={() => setVerEquipamentos(false)} />
   }
@@ -177,6 +202,24 @@ export default function Index() {
             </div>
 
             <div className="flex shrink-0 items-center">
+              {ehGestor && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setVerFinanceiro(true)}
+                  aria-label="Financeiro e margem por obra"
+                >
+                  <TrendingUp className="h-5 w-5" />
+                </Button>
+              )}
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setVerDespesas(true)}
+                aria-label="Despesas de campo"
+              >
+                <Wallet className="h-5 w-5" />
+              </Button>
               <Button
                 size="icon"
                 variant="ghost"
