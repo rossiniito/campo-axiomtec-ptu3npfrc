@@ -70,11 +70,69 @@ routerAdd(
     orcamento.set('obra', obra.id)
     $app.save(orcamento)
 
+    // --- 3. cronograma de recebimento: sinal + parcelas fixas ---
+    // Padrão do Rossini (12/11/2026): 40% de sinal + 2 parcelas de 30%,
+    // variável conforme negociação. Quem chama pode mandar os percentuais.
+    const valor = orcamento.getFloat('valor') || 0
+    let percentuais = [40, 30, 30]
+    if (Array.isArray(body.parcelas) && body.parcelas.length > 0) {
+      const enviados = []
+      let soma = 0
+      for (let i = 0; i < body.parcelas.length; i++) {
+        const n = parseFloat(String(body.parcelas[i]))
+        if (!isNaN(n) && n > 0) {
+          enviados.push(n)
+          soma += n
+        }
+      }
+      if (enviados.length > 0 && Math.abs(soma - 100) < 0.01) percentuais = enviados
+    }
+
+    const gerados = []
+    // só gera se ainda não existir parcela para esta obra+orçamento
+    const jaTem = $app.findRecordsByFilter('recebimentos', 'orcamento = {:o}', '', 1, 0, {
+      o: orcamento.id,
+    })
+
+    if (jaTem.length === 0 && valor > 0) {
+      const base = body.data_sinal ? new Date(String(body.data_sinal)) : new Date()
+      let acumulado = 0
+      for (let i = 0; i < percentuais.length; i++) {
+        const pct = percentuais[i]
+        const d = new Date(base.getTime())
+        d.setMonth(d.getMonth() + i)
+
+        const v =
+          i === percentuais.length - 1
+            ? Math.round((valor - acumulado) * 100) / 100
+            : Math.round(valor * (pct / 100) * 100) / 100
+        acumulado += v
+
+        const r = new Record($app.findCollectionByNameOrId('recebimentos'))
+        r.set('obra', obra.id)
+        r.set('orcamento', orcamento.id)
+        r.set('tipo', i === 0 ? 'sinal' : 'parcela')
+        r.set(
+          'descricao',
+          i === 0
+            ? 'Sinal (' + pct + '%)'
+            : 'Parcela ' + i + ' de ' + (percentuais.length - 1) + ' (' + pct + '%)',
+        )
+        r.set('percentual', pct)
+        r.set('valor', v)
+        r.set('vencimento', d.toISOString())
+        r.set('status', 'a_receber')
+        $app.save(r)
+        gerados.push({ tipo: i === 0 ? 'sinal' : 'parcela', percentual: pct, valor: v })
+      }
+    }
+
     return e.json(200, {
       orcamento: String(orcamento.get('cliente')),
       obra: String(obra.get('nome')),
       os: String(ordem.get('numero')),
       os_id: String(ordem.id),
+      recebimentos: gerados,
     })
   },
   $apis.requireAuth(),
