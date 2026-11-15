@@ -1,68 +1,70 @@
-/* TEMPORÁRIO — diagnóstico. Confere se a migration 0028 gravou os registros da
-   obra do Paulo. Removido logo após a conferência. */
-routerAdd(
-  'GET',
-  '/backend/v1/verifica-paulo',
-  (e) => {
-    const out = {}
-    let obraIds = []
-    try {
-      const obras = $app.findRecordsByFilter('obras', 'nome ~ "Paulo"', '', 10, 0)
-      out.obras = obras.map((o) => ({
-        id: o.id,
-        nome: String(o.get('nome')),
-        cliente: String(o.get('cliente')),
-        status: String(o.get('status')),
-        endereco: String(o.get('endereco')),
-        cliente_ref: String(o.get('cliente_ref')),
-      }))
-      obraIds = obras.map((o) => o.id)
-    } catch (err) {
-      out.obras_erro = String(err)
-    }
+/* TEMPORÁRIO — conferência. Grava no log do backend o que a migration 0028
+   criou, para eu ler o resultado real do banco. Removido em seguida.
 
-    try {
-      const cs = $app.findRecordsByFilter('clientes', 'nome ~ "Paulo"', '', 10, 0)
-      out.clientes = cs.map((c) => ({ id: c.id, nome: String(c.get('nome')) }))
-    } catch (err) {
-      out.clientes_erro = String(err)
-    }
+   onBootstrap: e.next() é a PRIMEIRA instrução. Antes dele não existe banco,
+   e qualquer $app.* segura um nil pointer (o catch não pega). */
+onBootstrap((e) => {
+  e.next()
 
-    for (let i = 0; i < obraIds.length; i++) {
-      const o = obraIds[i]
-      try {
-        out['orcamentos_' + i] = $app
-          .findRecordsByFilter('orcamentos', 'obra = {:o}', '', 50, 0, { o: o })
-          .map((r) => ({
-            cliente: String(r.get('cliente')),
-            valor: r.getFloat('valor'),
-            status: String(r.get('status')),
-            escopo: String(r.get('escopo')).slice(0, 60),
-          }))
-      } catch (err) {
-        out['orcamentos_erro_' + i] = String(err)
+  try {
+    const log = $app.logger()
+    const obras = $app.findRecordsByFilter('obras', 'nome ~ "Paulo"', '', 10, 0)
+    log.info('VERIFICA PAULO', 'obras', obras.length)
+
+    for (let i = 0; i < obras.length; i++) {
+      const o = obras[i]
+      const orc = $app.findRecordsByFilter('orcamentos', 'obra = {:o}', '', 50, 0, { o: o.id })
+      const eq = $app.findRecordsByFilter('equipamentos', 'obra = {:o}', '', 50, 0, { o: o.id })
+      const os = $app.findRecordsByFilter('ordens', 'obra = {:o}', '', 50, 0, { o: o.id })
+
+      let soma = 0
+      const detalhe = []
+      for (let k = 0; k < orc.length; k++) {
+        soma += orc[k].getFloat('valor')
+        detalhe.push(String(orc[k].getFloat('valor')))
       }
-      try {
-        out['equipamentos_' + i] = $app
-          .findRecordsByFilter('equipamentos', 'obra = {:o}', '', 50, 0, { o: o })
-          .map((r) => ({
-            nome: String(r.get('nome')),
-            modelo: String(r.get('modelo')),
-            valor_compra: r.getFloat('valor_compra'),
-          }))
-      } catch (err) {
-        out['equipamentos_erro_' + i] = String(err)
+      let custo = 0
+      const eqs = []
+      for (let k = 0; k < eq.length; k++) {
+        custo += eq[k].getFloat('valor_compra')
+        eqs.push(String(eq[k].get('modelo')) + '=' + String(eq[k].getFloat('valor_compra')))
       }
-      try {
-        out['ordens_' + i] = $app
-          .findRecordsByFilter('ordens', 'obra = {:o}', '', 50, 0, { o: o })
-          .map((r) => ({ numero: String(r.get('numero')), status: String(r.get('status')) }))
-      } catch (err) {
-        out['ordens_erro_' + i] = String(err)
-      }
+      const nums = []
+      for (let k = 0; k < os.length; k++) nums.push(String(os[k].get('numero')))
+
+      log.info(
+        'VERIFICA PAULO OBRA',
+        'id',
+        o.id,
+        'nome',
+        String(o.get('nome')),
+        'cliente',
+        String(o.get('cliente')),
+        'status',
+        String(o.get('status')),
+        'cliente_ref',
+        String(o.get('cliente_ref')),
+        'orcamentos',
+        orc.length,
+        'valores',
+        detalhe.join('|'),
+        'soma',
+        soma,
+        'equipamentos',
+        eq.length,
+        'equip',
+        eqs.join('|'),
+        'custo',
+        custo,
+        'margem',
+        soma - custo,
+        'ordens',
+        nums.join('|'),
+      )
     }
-    out.total_ordens_banco = $app.countRecords('ordens')
-    return e.json(200, out)
-  },
-  $apis.requireSuperuserAuth(),
-)
+  } catch (err) {
+    try {
+      $app.logger().error('VERIFICA PAULO ERRO', 'err', String(err))
+    } catch (_) {}
+  }
+})
