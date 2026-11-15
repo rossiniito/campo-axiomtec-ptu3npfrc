@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-12T11:07:03.779Z",
+  "generatedAt": "2026-11-15T17:36:53.774Z",
   "collections": [
     {
       "name": "users",
@@ -1456,6 +1456,188 @@
         "CREATE INDEX idx_despesas_obra ON despesas (obra)",
         "CREATE INDEX idx_despesas_tecnico ON despesas (tecnico)",
         "CREATE INDEX idx_despesas_status ON despesas (status)"
+      ]
+    },
+    {
+      "name": "propostas",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.perfil = \"gestor\"",
+        "view": "@request.auth.perfil = \"gestor\"",
+        "create": null,
+        "update": null,
+        "delete": "@request.auth.perfil = \"gestor\""
+      },
+      "fields": [
+        {
+          "name": "proposta_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "projeto",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cliente",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "rascunho",
+            "enviada",
+            "visualizada",
+            "aceita",
+            "recusada",
+            "expirada"
+          ]
+        },
+        {
+          "name": "vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "enviada_em",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "primeira_abertura",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ultima_atividade",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visitas",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "aceita_em",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "link_token",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "obra",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "obras"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_propostas_proposta_id ON propostas (proposta_id)",
+        "CREATE INDEX idx_propostas_status ON propostas (status)"
+      ]
+    },
+    {
+      "name": "vigia_resultado",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.perfil = \"gestor\"",
+        "view": "@request.auth.perfil = \"gestor\"",
+        "create": null,
+        "update": null,
+        "delete": "@request.auth.perfil = \"gestor\""
+      },
+      "fields": [
+        {
+          "name": "chave",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "executado_em",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "total_alertas",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "conteudo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_vigia_chave ON vigia_resultado (chave)"
       ]
     }
   ]
