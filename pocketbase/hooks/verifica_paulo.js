@@ -7,9 +7,8 @@ onBootstrap((e) => {
   e.next()
 
   try {
-    const log = $app.logger()
     const obras = $app.findRecordsByFilter('obras', 'nome ~ "Paulo"', '', 10, 0)
-    log.info('VERIFICA PAULO', 'obras', obras.length)
+    console.log('VERIFICA PAULO obras=' + obras.length)
 
     for (let i = 0; i < obras.length; i++) {
       const o = obras[i]
@@ -32,39 +31,36 @@ onBootstrap((e) => {
       const nums = []
       for (let k = 0; k < os.length; k++) nums.push(String(os[k].get('numero')))
 
-      log.info(
-        'VERIFICA PAULO OBRA',
-        'id',
-        o.id,
-        'nome',
-        String(o.get('nome')),
-        'cliente',
-        String(o.get('cliente')),
-        'status',
-        String(o.get('status')),
-        'cliente_ref',
-        String(o.get('cliente_ref')),
-        'orcamentos',
-        orc.length,
-        'valores',
-        detalhe.join('|'),
-        'soma',
-        soma,
-        'equipamentos',
-        eq.length,
-        'equip',
-        eqs.join('|'),
-        'custo',
-        custo,
-        'margem',
-        soma - custo,
-        'ordens',
-        nums.join('|'),
+      console.log(
+        'VERIFICA PAULO OBRA | id=' +
+          o.id +
+          ' | nome=' +
+          String(o.get('nome')) +
+          ' | cliente=' +
+          String(o.get('cliente')) +
+          ' | status=' +
+          String(o.get('status')) +
+          ' | cliente_ref=' +
+          String(o.get('cliente_ref')) +
+          ' | nOrc=' +
+          orc.length +
+          ' | valores=' +
+          detalhe.join('|') +
+          ' | soma=' +
+          soma +
+          ' | nEquip=' +
+          eq.length +
+          ' | equip=' +
+          eqs.join('|') +
+          ' | custo=' +
+          custo +
+          ' | margem=' +
+          (soma - custo) +
+          ' | ordens=' +
+          nums.join('|'),
       )
     }
   } catch (err) {
-    try {
-      $app.logger().error('VERIFICA PAULO ERRO', 'err', String(err))
-    } catch (_) {}
+    console.log('VERIFICA PAULO ERRO ' + String(err))
   }
 })
