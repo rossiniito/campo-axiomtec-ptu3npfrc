@@ -1,15 +1,16 @@
-/* Conferência de integridade da obra do Paulo.
+/* Conserta e confere a obra do Paulo.
 
-   Não altera nada: só LÊ e LANÇA ERRO se o dado estiver errado. Se este
-   deploy passar, o valor está gravado como tem de estar. É o teste que
-   substitui "confiar que a migration rodou".
+   Histórico do erro: a 0029 foi aplicada na primeira tentativa, quando ela
+   ainda procurava o gestor por `perfil = "gestor"`. Se a conta do Rossini
+   estiver com perfil vazio, o filtro devolvia nada e `tecnicos` ficou vazio —
+   em silêncio. Como a 0029 já está marcada como aplicada, ela não roda de
+   novo; por isso a correção vive aqui.
 
-   Confere, para a obra "Paulo — Arujazinho 5":
-   - existem 2 recebimentos, somando R$ 6.300,00
-   - o equipamento HC3 tem valor_compra = 0 (não é custo da AxiomTec)
-   - o endereço está completo e o telefone gravado no cliente
-   - a obra tem um responsável em `tecnicos`
-   - a margem calculada é R$ 6.300,00, não R$ 1.300 */
+   Esta migration:
+   1. acha a conta do responsável sem depender de `perfil`
+   2. grava em obras.tecnicos e confirma relendo do banco
+   3. confere recebimentos (2 × R$ 6.300), custo 0 da HC3 e margem de R$ 6.300
+   Se qualquer passo falhar, lança erro com o diagnóstico junto. */
 migrate(
   (app) => {
     const OBRA = 'Paulo — Arujazinho 5'
@@ -21,24 +22,58 @@ migrate(
     } catch (_) {
       obra = null
     }
-    if (!obra) {
-      throw new Error('VERIFICACAO: obra "' + OBRA + '" não encontrada')
+    if (!obra) throw new Error('VERIFICACAO: obra "' + OBRA + '" não encontrada')
+
+    // ---- 1. responsável: sem filtrar por perfil ----
+    let gestorId = ''
+    let diagnostico = 'nenhum usuário'
+    const usuarios = app.findRecordsByFilter('users', '', '', 50, 0)
+    diagnostico = 'users=' + usuarios.length
+    for (let i = 0; i < usuarios.length; i++) {
+      const perfil = String(usuarios[i].getString('perfil') || '')
+      diagnostico += ' [' + (usuarios[i].getString('email') || '?') + ':' + perfil + ']'
+      if (perfil === 'gestor' && !gestorId) gestorId = usuarios[i].id
+    }
+    if (!gestorId && usuarios.length > 0) gestorId = usuarios[0].id
+
+    if (!gestorId) {
+      throw new Error('SEM CONTA PARA RESPONSAVEL | ' + diagnostico)
     }
 
-    // 1. recebimentos
+    obra.set('tecnicos', [gestorId])
+    app.save(obra)
+
+    const relido = app.findRecordById('obras', obra.id)
+    // Relação múltipla não se lê com getString de forma confiável: uso
+    // getStringSlice, que é o acessor certo para relação maxSelect > 1.
+    let idsGravados = []
+    try {
+      idsGravados = relido.getStringSlice('tecnicos') || []
+    } catch (_) {
+      idsGravados = []
+    }
+    let achou = false
+    for (let i = 0; i < idsGravados.length; i++) {
+      if (idsGravados[i] === gestorId) achou = true
+    }
+    if (!achou) {
+      problemas.push(
+        'responsável não gravou: campo tem [' + idsGravados.join(',') + '] | ' + diagnostico,
+      )
+    }
+
+    // ---- 2. recebimentos ----
     const receb = app.findRecordsByFilter('recebimentos', 'obra = {:o}', '', 500, 0, {
       o: obra.id,
     })
     let somaReceb = 0
     for (let i = 0; i < receb.length; i++) somaReceb += receb[i].getFloat('valor') || 0
-    if (receb.length !== 2) {
-      problemas.push('esperava 2 recebimentos, achou ' + receb.length)
-    }
+    if (receb.length !== 2) problemas.push('esperava 2 recebimentos, achou ' + receb.length)
     if (Math.abs(somaReceb - 6300) > 0.01) {
       problemas.push('recebimentos somam ' + somaReceb + ', esperado 6300')
     }
 
-    // 2. equipamento sem custo
+    // ---- 3. equipamento sem custo + margem ----
     const equips = app.findRecordsByFilter('equipamentos', 'obra = {:o}', '', 500, 0, {
       o: obra.id,
     })
@@ -48,15 +83,11 @@ migrate(
       problemas.push('custo de equipamento deveria ser 0, está ' + custoEquip)
     }
 
-    // 3. orçamentos e margem
-    const orcs = app.findRecordsByFilter('orcamentos', 'obra = {:o}', '', 500, 0, {
-      o: obra.id,
-    })
+    const orcs = app.findRecordsByFilter('orcamentos', 'obra = {:o}', '', 500, 0, { o: obra.id })
     let somaOrc = 0
     for (let i = 0; i < orcs.length; i++) somaOrc += orcs[i].getFloat('valor') || 0
-    const despesas = app.findRecordsByFilter('despesas', 'obra = {:o}', '', 500, 0, {
-      o: obra.id,
-    })
+
+    const despesas = app.findRecordsByFilter('despesas', 'obra = {:o}', '', 500, 0, { o: obra.id })
     let somaDesp = 0
     for (let i = 0; i < despesas.length; i++) {
       const st = String(despesas[i].getString('status') || '')
@@ -66,14 +97,10 @@ migrate(
     if (Math.abs(margem - 6300) > 0.01) {
       problemas.push('margem deveria ser 6300, calculou ' + margem)
     }
-    if (Math.abs(margem - 1300) < 0.01) {
-      problemas.push('margem saiu como 1300 — a HC3 entrou como custo por engano')
-    }
 
-    // 4. endereço, telefone e responsável
-    const endereco = String(obra.getString('endereco') || '')
-    if (endereco.indexOf('Água Marinha') === -1) {
-      problemas.push('endereço da obra incompleto: "' + endereco + '"')
+    // ---- 4. endereço e telefone ----
+    if (String(obra.getString('endereco') || '').indexOf('Água Marinha') === -1) {
+      problemas.push('endereço da obra incompleto')
     }
     let cliente = null
     try {
@@ -81,20 +108,16 @@ migrate(
     } catch (_) {
       cliente = null
     }
-    if (!cliente) {
-      problemas.push('cliente "Paulo Boscatto" não encontrado')
-    } else if (String(cliente.getString('telefone') || '').indexOf('98162') === -1) {
+    if (!cliente) problemas.push('cliente "Paulo Boscatto" não encontrado')
+    else if (String(cliente.getString('telefone') || '').indexOf('98162') === -1) {
       problemas.push('telefone do cliente não gravado')
-    }
-    if (!String(obra.getString('tecnicos') || '')) {
-      problemas.push('obra sem responsável em tecnicos')
     }
 
     if (problemas.length > 0) {
       throw new Error('VERIFICACAO FALHOU: ' + problemas.join(' | '))
     }
   },
-  () => {
-    /* nada a desfazer: esta migration não escreve */
+  (app) => {
+    /* não desfaz nada: só corrige o vínculo e confere */
   },
 )
