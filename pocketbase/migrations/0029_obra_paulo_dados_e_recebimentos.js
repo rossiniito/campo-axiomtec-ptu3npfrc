@@ -69,16 +69,27 @@ migrate(
     } catch (e) {
       diagnostico = 'erro ao listar users: ' + String(e)
     }
-    if (gestorId) {
-      obra.set('tecnicos', [gestorId])
+    if (!gestorId) {
+      // Falha alto e claro: sem responsável, o técnico não vê a obra e o
+      // alerta não chega. O erro carrega o diagnóstico, sem depender de log.
+      throw new Error('SEM USUARIO PARA RESPONSAVEL | ' + diagnostico)
     }
+    obra.set('tecnicos', [gestorId])
     app.save(obra)
 
-    try {
-      app
-        .logger()
-        .info('obra do Paulo: responsável', 'gestorId', gestorId, 'diagnostico', diagnostico)
-    } catch (_) {}
+    // Confirma relendo do banco, não do objeto em memória.
+    const relido = app.findRecordById('obras', obra.id)
+    const gravado = String(relido.getString('tecnicos') || '')
+    if (gravado.indexOf(gestorId) === -1) {
+      throw new Error(
+        'RESPONSAVEL NAO GRAVOU | gestorId=' +
+          gestorId +
+          ' | campo ficou: "' +
+          gravado +
+          '" | ' +
+          diagnostico,
+      )
+    }
 
     // OS: marca o responsável e registra a data prevista de execução.
     try {
