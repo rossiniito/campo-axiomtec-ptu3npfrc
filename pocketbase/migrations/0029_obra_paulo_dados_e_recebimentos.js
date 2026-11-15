@@ -50,19 +50,35 @@ migrate(
 
     obra.set('endereco', ENDERECO)
 
-    // Responsável informado: Rossini Ito. Pego o gestor do banco em vez de
-    // gravar id na mão — assim não quebra se a conta for recriada.
+    // Responsável informado: Rossini Ito.
+    // Não filtro por perfil: se a conta dele ainda estiver com perfil vazio,
+    // o filtro devolveria nada e a obra ficaria sem responsável em silêncio
+    // (foi o que aconteceu na primeira tentativa). Pego a lista e escolho.
     let gestorId = ''
+    let diagnostico = 'nenhum usuário'
     try {
-      const gestores = app.findRecordsByFilter('users', 'perfil = "gestor"', '', 1, 0)
-      if (gestores.length > 0) gestorId = gestores[0].id
-    } catch (_) {
-      gestorId = ''
+      const usuarios = app.findRecordsByFilter('users', '', '', 50, 0)
+      diagnostico = 'users=' + usuarios.length
+      for (let i = 0; i < usuarios.length; i++) {
+        const perfil = String(usuarios[i].getString('perfil') || '')
+        diagnostico += ' [' + (usuarios[i].getString('email') || '?') + ' perfil=' + perfil + ']'
+        if (perfil === 'gestor' && !gestorId) gestorId = usuarios[i].id
+      }
+      // fallback: se ninguém tem perfil gestor, usa a primeira conta existente
+      if (!gestorId && usuarios.length > 0) gestorId = usuarios[0].id
+    } catch (e) {
+      diagnostico = 'erro ao listar users: ' + String(e)
     }
-    if (gestorId && !String(obra.getString('tecnicos') || '')) {
+    if (gestorId) {
       obra.set('tecnicos', [gestorId])
     }
     app.save(obra)
+
+    try {
+      app
+        .logger()
+        .info('obra do Paulo: responsável', 'gestorId', gestorId, 'diagnostico', diagnostico)
+    } catch (_) {}
 
     // OS: marca o responsável e registra a data prevista de execução.
     try {
