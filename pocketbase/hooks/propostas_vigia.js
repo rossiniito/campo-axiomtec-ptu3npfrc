@@ -11,9 +11,8 @@
 
    O alerta é só para o gestor (decisão do Rossini em 12/11/2026: ele centraliza
    o follow-up). Não manda e-mail: devolve a lista, e o agente entrega no chat. */
-const DIAS_MS = 24 * 60 * 60 * 1000
-
 cronAdd('propostas_vigia', '0 11 * * *', () => {
+  const DIAS_MS = 24 * 60 * 60 * 1000
   const agora = Date.now()
 
   let propostas = []
