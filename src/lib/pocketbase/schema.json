@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-15T19:54:07.912Z",
+  "generatedAt": "2026-11-15T19:58:27.062Z",
   "collections": [
     {
       "name": "users",
@@ -1879,6 +1879,268 @@
       "indexes": [
         "CREATE INDEX idx_pag_venc ON pagamentos (vencimento)",
         "CREATE INDEX idx_pag_status ON pagamentos (status)"
+      ]
+    },
+    {
+      "name": "contas",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.perfil = \"gestor\"",
+        "view": "@request.auth.perfil = \"gestor\"",
+        "create": "@request.auth.perfil = \"gestor\"",
+        "update": "@request.auth.perfil = \"gestor\"",
+        "delete": "@request.auth.perfil = \"gestor\""
+      },
+      "fields": [
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "banco",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "corrente",
+            "investimento",
+            "capital_giro",
+            "pagamento",
+            "parceria"
+          ]
+        },
+        {
+          "name": "finalidade",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "saldo",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "saldo_em",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_terceiro",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tem_cartao",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "limite_cartao",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fatura_aberta",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fatura_venc",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ativo",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_contas_nome ON contas (nome)"
+      ]
+    },
+    {
+      "name": "aportes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.perfil = \"gestor\"",
+        "view": "@request.auth.perfil = \"gestor\"",
+        "create": "@request.auth.perfil = \"gestor\"",
+        "update": "@request.auth.perfil = \"gestor\"",
+        "delete": "@request.auth.perfil = \"gestor\""
+      },
+      "fields": [
+        {
+          "name": "valor",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "data",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "conta",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "contas"
+        },
+        {
+          "name": "motivo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "pendente",
+            "feito",
+            "cancelado"
+          ]
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_aportes_status ON aportes (status)"
+      ]
+    },
+    {
+      "name": "config_financeiro",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != \"\"",
+        "view": "@request.auth.id != \"\"",
+        "create": "@request.auth.perfil = \"gestor\"",
+        "update": "@request.auth.perfil = \"gestor\"",
+        "delete": "@request.auth.perfil = \"gestor\""
+      },
+      "fields": [
+        {
+          "name": "chave",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "piso_caixa",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "custo_fixo_mensal",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "break_even_mensal",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_config_chave ON config_financeiro (chave)"
       ]
     }
   ]
