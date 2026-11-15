@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
+  Briefcase,
   ChevronRight,
   CloudDownload,
   Loader2,
@@ -26,6 +27,7 @@ import Equipamentos from './Equipamentos'
 import Despesas from './Despesas'
 import Financeiro from './Financeiro'
 import Caixa from './Caixa'
+import SituacaoObras from './SituacaoObras'
 import { useAuth } from '@/lib/auth'
 import { type Ordem, ROTULO_STATUS, listarOrdens, puxarDoClickUp } from '@/services/ordens'
 import {
@@ -54,6 +56,7 @@ export default function Index() {
   const [verDespesas, setVerDespesas] = useState(false)
   const [verFinanceiro, setVerFinanceiro] = useState(false)
   const [verCaixa, setVerCaixa] = useState(false)
+  const [verObras, setVerObras] = useState(false)
   const [online, setOnline] = useState(navigator.onLine)
   const [carregando, setCarregando] = useState(true)
   const [buscando, setBuscando] = useState(false)
@@ -134,6 +137,10 @@ export default function Index() {
     }
   }
 
+  if (verObras && ehGestor) {
+    return <SituacaoObras onVoltar={() => setVerObras(false)} />
+  }
+
   if (verEquipe && ehGestor) {
     return <Equipe onVoltar={() => setVerEquipe(false)} />
   }
@@ -209,6 +216,16 @@ export default function Index() {
             </div>
 
             <div className="flex shrink-0 items-center">
+              {ehGestor && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setVerObras(true)}
+                  aria-label="Situação dos clientes e obras"
+                >
+                  <Briefcase className="h-5 w-5" />
+                </Button>
+              )}
               {ehGestor && (
                 <Button
                   size="icon"
