@@ -2,6 +2,7 @@
 // podia aplicar a situação em obra errada ("Marina" casaria com
 // "Marina Home Theater"). Aqui uso comparação exata normalizada e crio a obra
 // só quando não existe nenhuma com o mesmo nome — idempotente.
+// ATENÇÃO: em migration o objeto é `app`, não `$app` ($app é só em hooks).
 migrate(
   (app) => {
     function normalizar(t) {
@@ -56,10 +57,9 @@ migrate(
         obra.set('status', alvo.status)
         obra.set('situacao', alvo.situacao)
         obra.set('status_em', agora)
-        $app.save(obra)
+        app.save(obra)
       } else {
-        // só corrige o status se ele ainda for o antigo/genérico; não sobrescreve
-        // o que o Rossini já tiver ajustado na tela depois de ontem
+        // não sobrescreve o que já tiver sido ajustado na tela
         const atual = String(obra.get('status') || '')
         if (
           atual === 'aguardando' ||
@@ -73,7 +73,7 @@ migrate(
         if (!String(obra.get('situacao') || '').trim()) {
           obra.set('situacao', alvo.situacao)
         }
-        $app.save(obra)
+        app.save(obra)
       }
     }
   },
