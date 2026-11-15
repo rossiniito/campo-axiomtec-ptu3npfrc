@@ -10,13 +10,13 @@ import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { ChevronLeft, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { Banknote, ChevronLeft, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { toast } from 'sonner'
 import { type MargemObra, brl, carregarMargem } from '@/services/financeiro'
 
-type Props = { onVoltar: () => void; onDespesas: () => void }
+type Props = { onVoltar: () => void; onDespesas: () => void; onCaixa: () => void }
 
-export default function Financeiro({ onVoltar, onDespesas }: Props) {
+export default function Financeiro({ onVoltar, onDespesas, onCaixa }: Props) {
   const [linhas, setLinhas] = useState<MargemObra[]>([])
   const [totais, setTotais] = useState({ receita: 0, custo: 0, margem: 0, pendente: 0 })
   const [carregando, setCarregando] = useState(true)
@@ -47,6 +47,9 @@ export default function Financeiro({ onVoltar, onDespesas }: Props) {
             </p>
             <h1 className="text-lg font-semibold">Margem por obra</h1>
           </div>
+          <Button size="sm" variant="outline" className="gap-1" onClick={onCaixa}>
+            <Banknote className="h-4 w-4" /> Caixa
+          </Button>
           <Button size="sm" variant="outline" className="gap-1" onClick={onDespesas}>
             <Wallet className="h-4 w-4" /> Despesas
           </Button>

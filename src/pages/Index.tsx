@@ -25,6 +25,7 @@ import Chamados from './Chamados'
 import Equipamentos from './Equipamentos'
 import Despesas from './Despesas'
 import Financeiro from './Financeiro'
+import Caixa from './Caixa'
 import { useAuth } from '@/lib/auth'
 import { type Ordem, ROTULO_STATUS, listarOrdens, puxarDoClickUp } from '@/services/ordens'
 import {
@@ -52,6 +53,7 @@ export default function Index() {
   const [verEquipamentos, setVerEquipamentos] = useState(false)
   const [verDespesas, setVerDespesas] = useState(false)
   const [verFinanceiro, setVerFinanceiro] = useState(false)
+  const [verCaixa, setVerCaixa] = useState(false)
   const [online, setOnline] = useState(navigator.onLine)
   const [carregando, setCarregando] = useState(true)
   const [buscando, setBuscando] = useState(false)
@@ -150,11 +152,16 @@ export default function Index() {
     )
   }
 
+  if (verCaixa && ehGestor) {
+    return <Caixa onVoltar={() => setVerCaixa(false)} />
+  }
+
   if (verFinanceiro && ehGestor) {
     return (
       <Financeiro
         onVoltar={() => setVerFinanceiro(false)}
         onDespesas={() => setVerDespesas(true)}
+        onCaixa={() => setVerCaixa(true)}
       />
     )
   }
