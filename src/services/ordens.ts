@@ -17,6 +17,7 @@ export type Ordem = {
   checkin_em?: string
   checkout_em?: string
   pendencia_cliente?: string
+  modelo?: string
   sincronizada_em?: string
   ultimo_erro_sync?: string
   observacao_sync?: string

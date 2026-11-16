@@ -9,9 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ChevronLeft, Loader2, Plus, Trash2, UserCheck, Users, X } from 'lucide-react'
+import { ChevronLeft, KeyRound, Loader2, Plus, Trash2, UserCheck, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Usuario } from '@/lib/auth'
+import TrocarSenha from './TrocarSenha'
 import {
   criarUsuario,
   definirEquipeDaObra,
@@ -28,6 +29,7 @@ export default function Equipe({ onVoltar }: Props) {
   const [obras, setObras] = useState<ObraEquipe[]>([])
   const [carregando, setCarregando] = useState(true)
   const [novo, setNovo] = useState(false)
+  const [verTrocarSenha, setVerTrocarSenha] = useState(false)
 
   async function carregar() {
     try {
@@ -61,6 +63,8 @@ export default function Equipe({ onVoltar }: Props) {
 
   return (
     <div className="min-h-screen bg-background pb-24">
+      {verTrocarSenha && <TrocarSenha onVoltar={() => setVerTrocarSenha(false)} />}
+
       <header className="sticky top-0 z-10 border-b bg-background px-4 py-3">
         <div className="mx-auto flex max-w-2xl items-center gap-2">
           <Button variant="ghost" size="icon" onClick={onVoltar} aria-label="Voltar">
@@ -82,6 +86,10 @@ export default function Equipe({ onVoltar }: Props) {
         {carregando && (
           <p className="py-8 text-center text-sm text-muted-foreground">Carregando…</p>
         )}
+
+        <Button variant="outline" className="w-full gap-2" onClick={() => setVerTrocarSenha(true)}>
+          <KeyRound className="h-4 w-4" /> Trocar minha senha
+        </Button>
 
         {/* ---------- pessoas ---------- */}
         <section className="space-y-2">

@@ -13,6 +13,7 @@ export type Despesa = {
   tipo?: string
   valor: number
   data?: string
+  created?: string
   obra: string
   tecnico: string
   comprovante?: string[]

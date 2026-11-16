@@ -4,7 +4,17 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { ChevronLeft, ChevronDown, ChevronUp, Loader2, Plus, Save, Trash2, X } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronDown,
+  ChevronUp,
+  House,
+  Loader2,
+  Plus,
+  Save,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import {
   type BlocoModelo,
@@ -16,7 +26,7 @@ import {
   totalDeItens,
 } from '@/services/modelos'
 
-export default function Modelos() {
+export default function Modelos({ onSair }: { onSair?: () => void }) {
   const [modelos, setModelos] = useState<Modelo[]>([])
   const [carregando, setCarregando] = useState(true)
   const [editando, setEditando] = useState<Modelo | 'novo' | null>(null)
@@ -42,6 +52,7 @@ export default function Modelos() {
           setEditando(null)
           carregar()
         }}
+        onSair={onSair}
       />
     )
   }
@@ -50,6 +61,14 @@ export default function Modelos() {
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-10 border-b bg-background px-4 py-3">
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onSair?.()}
+            aria-label="Voltar ao menu"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               AxiomTec · Campo
@@ -113,7 +132,15 @@ export default function Modelos() {
   )
 }
 
-function EditorModelo({ modelo, onVoltar }: { modelo: Modelo | null; onVoltar: () => void }) {
+function EditorModelo({
+  modelo,
+  onVoltar,
+  onSair,
+}: {
+  modelo: Modelo | null
+  onVoltar: () => void
+  onSair?: () => void
+}) {
   const [nome, setNome] = useState(modelo?.nome ?? '')
   const [descricao, setDescricao] = useState(modelo?.descricao ?? '')
   const [categoria, setCategoria] = useState(modelo?.categoria ?? 'automacao')
@@ -221,7 +248,7 @@ function EditorModelo({ modelo, onVoltar }: { modelo: Modelo | null; onVoltar: (
     <div className="min-h-screen bg-background pb-28">
       <header className="sticky top-0 z-10 border-b bg-background px-4 py-3">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={onVoltar} aria-label="Voltar">
+          <Button variant="ghost" size="icon" onClick={onVoltar} aria-label="Voltar para a lista">
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div className="min-w-0 flex-1">
@@ -232,6 +259,15 @@ function EditorModelo({ modelo, onVoltar }: { modelo: Modelo | null; onVoltar: (
               {estrutura.length} ambientes · {total} itens
             </p>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1 text-xs"
+            onClick={() => onSair?.()}
+            aria-label="Voltar ao menu inicial"
+          >
+            <House className="h-4 w-4" /> Menu
+          </Button>
           <Button size="sm" className="gap-1" onClick={salvar} disabled={salvando}>
             {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Salvar

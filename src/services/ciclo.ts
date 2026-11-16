@@ -67,6 +67,7 @@ export type Chamado = {
   prioridade?: 'baixa' | 'normal' | 'alta' | 'urgente'
   status?: 'aberto' | 'agendado' | 'em_andamento' | 'resolvido' | 'cancelado'
   tecnico?: string
+  created?: string
   aberto_em?: string
   agendado_para?: string
   fechado_em?: string

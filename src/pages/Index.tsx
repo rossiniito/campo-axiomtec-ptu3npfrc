@@ -169,6 +169,7 @@ export default function Index() {
         onVoltar={() => setVerFinanceiro(false)}
         onDespesas={() => setVerDespesas(true)}
         onCaixa={() => setVerCaixa(true)}
+        onContas={() => setVerCaixa(true)}
       />
     )
   }
@@ -178,7 +179,7 @@ export default function Index() {
   }
 
   if (verModelos) {
-    return <Modelos />
+    return <Modelos onSair={() => setVerModelos(false)} />
   }
 
   if (ordemAberta) {
