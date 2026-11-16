@@ -1,8 +1,14 @@
 /* Quem está logado e qual o perfil.
 
    O perfil vem do registro do usuário (`users.perfil`) e é gravado no
-   servidor: a tela só esconde o que o servidor já bloqueia. */
+   servidor: a tela só esconde o que o servidor já bloqueia.
+
+   Sessão: o token do PocketBase tem prazo e vence com o app aberto (PWA
+   no celular fica dias aberto). Renovamos de tempo em tempo; se uma
+   chamada voltar 401 mesmo assim, a sessão é limpa e o app volta ao
+   login com o aviso "Sua sessão expirou" — em vez do erro cru. */
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { ClientResponseError } from 'pocketbase'
 import pb from '@/lib/pocketbase/client'
 
 export type Perfil = 'gestor' | 'tecnico'
@@ -25,6 +31,35 @@ type Contexto = {
 
 const AuthCtx = createContext<Contexto | null>(null)
 
+/** Aviso pendente de sessão expirada, lido pela tela de login. */
+let sessaoExpirou = false
+
+function marcarSessaoExpirada() {
+  sessaoExpirou = true
+}
+
+/** Lê e limpa o aviso (a tela de login consome uma vez). */
+export function consumirSessaoExpirada(): boolean {
+  const valor = sessaoExpirou
+  sessaoExpirou = false
+  return valor
+}
+
+/** Encerra a sessão marcando que expirou — o Portao leva ao login. */
+function encerrarSessaoExpirada() {
+  marcarSessaoExpirada()
+  pb.authStore.clear()
+}
+
+/** True quando o erro foi 401: limpa a sessão e avisa o login. */
+export function eSessaoExpirada(erro: unknown): boolean {
+  if (erro instanceof ClientResponseError && erro.status === 401) {
+    encerrarSessaoExpirada()
+    return true
+  }
+  return false
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(() =>
     pb.authStore.isValid ? (pb.authStore.record as unknown as Usuario) : null,
@@ -38,11 +73,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAutenticado(pb.authStore.isValid)
     })
 
+    const renovar = async () => {
+      if (!pb.authStore.isValid) return
+      try {
+        await pb.collection('users').authRefresh()
+      } catch {
+        // token vencido ou revogado: volta ao login com o aviso
+        encerrarSessaoExpirada()
+      }
+    }
+
     if (pb.authStore.isValid) {
-      pb.collection('users')
-        .authRefresh()
-        .catch(() => pb.authStore.clear())
-        .finally(() => setCarregando(false))
+      renovar().finally(() => setCarregando(false))
+      // renova bem antes do prazo do token (padrão do PocketBase: 5 dias)
+      const intervalo = setInterval(() => void renovar(), 12 * 60 * 60 * 1000)
+      window.addEventListener('online', renovar)
+      return () => {
+        clearInterval(intervalo)
+        window.removeEventListener('online', renovar)
+        cancelar()
+      }
     } else {
       if (pb.authStore.record) pb.authStore.clear()
       setCarregando(false)

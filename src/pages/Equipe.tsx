@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ChevronLeft, KeyRound, Loader2, Plus, Trash2, UserCheck, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Usuario } from '@/lib/auth'
+import { eSessaoExpirada, type Usuario } from '@/lib/auth'
+import { getErrorMessage } from '@/lib/pocketbase/errors'
 import TrocarSenha from './TrocarSenha'
 import {
   criarUsuario,
@@ -36,8 +37,8 @@ export default function Equipe({ onVoltar }: Props) {
       const [u, o] = await Promise.all([listarUsuarios(), listarObras()])
       setUsuarios(u)
       setObras(o)
-    } catch {
-      toast.error('Não foi possível carregar a equipe')
+    } catch (e) {
+      if (!eSessaoExpirada(e)) toast.error('Não foi possível carregar a equipe')
     }
     setCarregando(false)
   }
@@ -56,7 +57,8 @@ export default function Equipe({ onVoltar }: Props) {
       await definirEquipeDaObra(obra.id, novos)
       toast.success(`Equipe de ${obra.nome} atualizada`)
     } catch (e) {
-      toast.error('Não foi possível salvar', { description: String(e) })
+      if (eSessaoExpirada(e)) return
+      toast.error('Não foi possível salvar', { description: getErrorMessage(e) })
       await carregar()
     }
   }
@@ -126,7 +128,8 @@ export default function Equipe({ onVoltar }: Props) {
                         await carregar()
                         toast.success('Acesso removido')
                       } catch (e) {
-                        toast.error('Não foi possível remover', { description: String(e) })
+                        if (eSessaoExpirada(e)) return
+                        toast.error('Não foi possível remover', { description: getErrorMessage(e) })
                       }
                     }}
                   >
@@ -220,7 +223,8 @@ function FormPessoa({ onFechar, onSalvo }: { onFechar: () => void; onSalvo: () =
       })
       onSalvo()
     } catch (e) {
-      toast.error('Não foi possível criar', { description: String(e) })
+      if (eSessaoExpirada(e)) return
+      toast.error('Não foi possível criar', { description: getErrorMessage(e) })
     }
     setSalvando(false)
   }

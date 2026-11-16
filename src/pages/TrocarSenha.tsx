@@ -11,7 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChevronLeft, KeyRound, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
-import { useAuth } from '@/lib/auth'
+import { eSessaoExpirada, useAuth } from '@/lib/auth'
+import { getErrorMessage } from '@/lib/pocketbase/errors'
 
 type Props = { onVoltar: () => void }
 
@@ -44,7 +45,8 @@ export default function TrocarSenha({ onVoltar }: Props) {
       toast.success('Senha alterada', { description: 'Sua nova senha já está em uso.' })
       onVoltar()
     } catch (e) {
-      const texto = String(e)
+      if (eSessaoExpirada(e)) return
+      const texto = getErrorMessage(e)
       if (texto.toLowerCase().includes('senha atual')) {
         setErroAtual('A senha atual não confere')
       } else {
