@@ -3,6 +3,7 @@
    conexão ficam nesta fila e são reenviadas quando o sinal volta. */
 import pb from '@/lib/pocketbase/client'
 import { urlArquivo } from '@/lib/files'
+import { eSessaoExpirada } from '@/lib/auth'
 
 const CACHE_KEY = 'campo:cache:v1'
 const QUEUE_KEY = 'campo:fila:v1'
@@ -39,6 +40,10 @@ export type Item = {
   ordem_servico?: string
   clickup_item_id?: string
   clickup_checklist_id?: string
+  /** Tarefa criada manualmente na tela de execução (não veio de modelo). */
+  avulso?: boolean
+  /** Quem criou a tarefa avulsa (usuário). */
+  criado_por?: string
 }
 
 export type Cache = {
@@ -55,7 +60,113 @@ export type Alteracao = {
   observacao: string
 }
 
+/** Tarefa avulsa criada offline, esperando o sinal para virar registro. */
+export type TarefaAvulsa = {
+  id: string
+  obra: string
+  ambiente: string
+  nome: string
+  criadoPor: string
+  /** OS em que a tarefa nasceu (quando a execução é por OS). */
+  ordemServico?: string
+}
+
+const TAREFAS_KEY = 'campo:tarefas-avulsas:v1'
+
 const CACHE_VAZIO: Cache = { obras: [], ambientes: [], itens: [], atualizadoEm: null }
+
+/** Lista de tarefas avulsas ainda não enviadas ao servidor. */
+export function lerTarefasAvulsas(): TarefaAvulsa[] {
+  try {
+    const bruto = localStorage.getItem(TAREFAS_KEY)
+    if (!bruto) return []
+    return JSON.parse(bruto) as TarefaAvulsa[]
+  } catch {
+    return []
+  }
+}
+
+function salvarTarefasAvulsas(tarefas: TarefaAvulsa[]) {
+  try {
+    localStorage.setItem(TAREFAS_KEY, JSON.stringify(tarefas))
+  } catch {
+    /* ignora */
+  }
+}
+
+function novoIdLocal(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `local-${Date.now()}-${Math.random()}`
+}
+
+/**
+ * Guarda a tarefa avulsa localmente e devolve o "item" temporário
+ * (id local, prefixo "local:") para a tela mostrar na hora — online ou não.
+ */
+export function adicionarTarefaLocal(
+  obra: string,
+  ambiente: string,
+  nome: string,
+  criadoPor: string,
+  ordemServico?: string,
+): Item {
+  const tarefa: TarefaAvulsa = { id: novoIdLocal(), obra, ambiente, nome, criadoPor, ordemServico }
+  const tarefas = lerTarefasAvulsas()
+  tarefas.push(tarefa)
+  salvarTarefasAvulsas(tarefas)
+  return itemDaTarefa(tarefa)
+}
+
+/** Converte a tarefa pendente no formato de Item para a tela de execução. */
+function itemDaTarefa(t: TarefaAvulsa): Item {
+  return {
+    id: `local:${t.id}`,
+    obra: t.obra,
+    ambiente: t.ambiente,
+    nome: t.nome,
+    concluido: false,
+    avulso: true,
+    ...(t.ordemServico ? { ordem_servico: t.ordemServico } : {}),
+  }
+}
+
+/** Itens avulsos ainda pendentes, convertidos em Item para a tela. */
+export function itensAvulsosLocais(obra: string): Item[] {
+  return lerTarefasAvulsas()
+    .filter((t) => t.obra === obra)
+    .map(itemDaTarefa)
+}
+
+/** Remove a tarefa pendente da fila (após o envio bem-sucedido). */
+function descartarTarefa(tarefaId: string) {
+  salvarTarefasAvulsas(lerTarefasAvulsas().filter((t) => t.id !== tarefaId))
+}
+
+/** Envia as tarefas avulsas criadas offline; devolve quantas subiram. */
+export async function enviarTarefasAvulsas(): Promise<number> {
+  const tarefas = lerTarefasAvulsas()
+  if (tarefas.length === 0) return 0
+  const restantes: TarefaAvulsa[] = []
+  let enviadas = 0
+  for (const t of tarefas) {
+    try {
+      await pb.collection('itens').create({
+        obra: t.obra,
+        ambiente: t.ambiente,
+        nome: t.nome,
+        avulso: true,
+        criado_por: t.criadoPor,
+        ...(t.ordemServico ? { ordem_servico: t.ordemServico } : {}),
+      })
+      enviadas += 1
+    } catch {
+      restantes.push(t)
+    }
+  }
+  salvarTarefasAvulsas(restantes)
+  return enviadas
+}
 
 export function lerCache(): Cache {
   try {
@@ -142,8 +253,16 @@ export async function baixarTudo(): Promise<Cache> {
 
 /** Reenvia a fila de alterações feitas offline. */
 export async function sincronizar(): Promise<{ enviados: number; restantes: number }> {
+  // tarefas avulsas criadas offline sobem junto com as marcações
+  let tarefasEnviadas = 0
+  try {
+    tarefasEnviadas = await enviarTarefasAvulsas()
+  } catch {
+    /* tenta de novo na próxima sincronização */
+  }
+
   const fila = lerFila()
-  if (fila.length === 0) return { enviados: 0, restantes: 0 }
+  if (fila.length === 0) return { enviados: tarefasEnviadas, restantes: 0 }
 
   const ultimaPorItem = new Map<string, Alteracao>()
   fila.forEach((f) => ultimaPorItem.set(f.itemId, f))
@@ -166,7 +285,43 @@ export async function sincronizar(): Promise<{ enviados: number; restantes: numb
   }
 
   salvarFila(restantes)
-  return { enviados, restantes: restantes.length }
+  return { enviados: enviados + tarefasEnviadas, restantes: restantes.length }
+}
+
+/**
+ * Cria a tarefa avulsa na OS: online grava no servidor e baixa o cache;
+ * offline (ou se a gravação falhar) guarda no aparelho e sobe depois,
+ * junto com as marcações. Devolve o item temporário no caminho offline.
+ */
+export async function criarTarefaAvulsa(params: {
+  obra: string
+  ambiente: string
+  ordemServico?: string
+  nome: string
+  criadoPor: string
+  online: boolean
+}): Promise<{ noServidor: boolean; erro?: unknown }> {
+  const { obra, ambiente, ordemServico, nome, criadoPor, online } = params
+  if (online) {
+    try {
+      await pb.collection('itens').create({
+        obra,
+        ambiente,
+        nome,
+        avulso: true,
+        criado_por: criadoPor,
+        ...(ordemServico ? { ordem_servico: ordemServico } : {}),
+      })
+      await baixarTudo()
+      return { noServidor: true }
+    } catch (erro) {
+      // sessão vencida é tratada pela tela (eSessaoExpirada); o resto
+      // (sem permissão, rede oscilando) cai para a fila offline
+      if (eSessaoExpirada(erro)) return { noServidor: false, erro }
+    }
+  }
+  adicionarTarefaLocal(obra, ambiente, nome, criadoPor)
+  return { noServidor: false }
 }
 
 /** Foto precisa de conexão: o arquivo não cabe na fila de texto. */

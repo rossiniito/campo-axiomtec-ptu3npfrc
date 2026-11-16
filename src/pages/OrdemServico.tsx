@@ -15,12 +15,14 @@ import {
   Loader2,
   LogIn,
   LogOut,
+  Plus,
   RefreshCw,
   Sparkles,
   WifiOff,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import RelatorioEntrega from './RelatorioEntrega'
+import AdicionarTarefa from '@/components/AdicionarTarefa'
 import {
   type Ordem,
   ROTULO_STATUS,
@@ -34,11 +36,14 @@ import {
   type Item,
   baixarTudo,
   comAlteracoesLocais,
+  criarTarefaAvulsa,
   enfileirar,
+  itensAvulsosLocais,
   lerCache,
   lerFila,
   sincronizar,
 } from '@/lib/offline'
+import { eSessaoExpirada, useAuth } from '@/lib/auth'
 
 type Props = {
   ordem: Ordem
@@ -59,14 +64,23 @@ export default function OrdemServico({ ordem, onVoltar, onAtualizada }: Props) {
   const [salvando, setSalvando] = useState(false)
   const [modelos, setModelos] = useState<Modelo[]>([])
   const [aplicando, setAplicando] = useState<string | null>(null)
+  const { usuario } = useAuth()
 
   function carregar() {
     const cache = comAlteracoesLocais(lerCache())
-    const daOrdem = cache.itens.filter((i) => i.ordem_servico === ordem.id)
+    // tarefas avulsas criadas offline ainda não têm registro no servidor:
+    // entram na lista como itens temporários (id "local:...") até sincronizar
+    const avulsasPendentes = itensAvulsosLocais(ordem.obra).filter(
+      (t) => t.ordem_servico === ordem.id,
+    )
+    const daOrdem = [
+      ...cache.itens.filter((i) => i.ordem_servico === ordem.id),
+      ...avulsasPendentes,
+    ]
     setItens(daOrdem)
     const idsAmb = new Set(daOrdem.map((i) => i.ambiente))
     setAmbientes(cache.ambientes.filter((a) => idsAmb.has(a.id)))
-    setPendentes(lerFila().length)
+    setPendentes(lerFila().length + avulsasPendentes.length)
   }
 
   useEffect(() => {
@@ -166,6 +180,33 @@ export default function OrdemServico({ ordem, onVoltar, onAtualizada }: Props) {
       toast.success(r.enviados > 0 ? `${r.enviados} enviada(s)` : 'Tudo sincronizado')
     } catch {
       toast.error('Sem conexão')
+    }
+  }
+
+  /** Cria a tarefa avulsa na seção desta OS; offline, fica no aparelho e sobe depois. */
+  async function adicionarTarefa(ambiente: Ambiente, nome: string) {
+    const nomeLimpo = nome.trim()
+    if (!nomeLimpo) return
+    const r = await criarTarefaAvulsa({
+      obra: ordem.obra,
+      ambiente: ambiente.id,
+      ordemServico: ordem.id,
+      nome: nomeLimpo,
+      criadoPor: usuario?.id ?? '',
+      online,
+    })
+    carregar()
+    if (r.erro !== undefined) {
+      if (eSessaoExpirada(r.erro)) return
+    }
+    if (r.noServidor) {
+      toast.success('Tarefa adicionada')
+    } else {
+      toast.success('Tarefa adicionada', {
+        description: online
+          ? 'Sem permissão agora — ficou no aparelho e tenta subir ao sincronizar.'
+          : 'Salva no aparelho; sobe para o servidor quando o sinal voltar.',
+      })
     }
   }
 
@@ -482,6 +523,12 @@ export default function OrdemServico({ ordem, onVoltar, onAtualizada }: Props) {
                   </li>
                 ))}
               </ul>
+              <AdicionarTarefa
+                onSalvar={(nome) => {
+                  void adicionarTarefa(ambiente, nome)
+                }}
+                onCancelar={() => undefined}
+              />
             </section>
           )
         })}

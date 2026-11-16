@@ -2,20 +2,34 @@ import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
-import { ChevronLeft, Camera, WifiOff, RefreshCw, Check, FileText, Trash2 } from 'lucide-react'
+import {
+  ChevronLeft,
+  Camera,
+  WifiOff,
+  RefreshCw,
+  Check,
+  FileText,
+  Plus,
+  Trash2,
+} from 'lucide-react'
 import { garantirTokenArquivo } from '@/lib/files'
+import { eSessaoExpirada, useAuth } from '@/lib/auth'
 import { toast } from 'sonner'
 import RelatorioEntrega from './RelatorioEntrega'
+import AdicionarTarefa from '@/components/AdicionarTarefa'
 import {
   type Ambiente,
   type Item,
   type Obra,
   apagarFoto,
   comAlteracoesLocais,
+  criarTarefaAvulsa,
   enfileirar,
   enviarFoto,
+  itensAvulsosLocais,
   lerCache,
   lerFila,
   sincronizar,
@@ -37,14 +51,18 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
   const [mostrarRelatorio, setMostrarRelatorio] = useState(false)
   // muda quando o token de arquivo chega: as fotos protegidas recarregam
   const [tokenArquivo, setTokenArquivo] = useState(0)
+  const { usuario } = useAuth()
 
   function carregarDoCache() {
     // comAlteracoesLocais reaplica a fila: sem isso, recarregar a página
     // offline mostraria o dado antigo e a marcação sumiria da tela.
     const cache = comAlteracoesLocais(lerCache())
     setAmbientes(cache.ambientes.filter((a) => a.obra === obra.id))
-    setItens(cache.itens.filter((i) => i.obra === obra.id))
-    setPendentes(lerFila().length)
+    // tarefas avulsas criadas offline ainda não têm registro no servidor:
+    // entram na lista como itens temporários (id "local:...") até sincronizar
+    const avulsasPendentes = itensAvulsosLocais(obra.id)
+    setItens([...cache.itens.filter((i) => i.obra === obra.id), ...avulsasPendentes])
+    setPendentes(lerFila().length + avulsasPendentes.length)
     // foto é arquivo protegido: sem token a imagem não abre
     garantirTokenArquivo().then(() => setTokenArquivo((n) => n + 1))
   }
@@ -126,6 +144,31 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
     }
   }
 
+  /** Cria a tarefa avulsa na seção; offline, fica no aparelho e sobe depois. */
+  async function adicionarTarefa(ambiente: Ambiente, nome: string) {
+    const nomeLimpo = nome.trim()
+    if (!nomeLimpo) return
+    const r = await criarTarefaAvulsa({
+      obra: obra.id,
+      ambiente: ambiente.id,
+      nome: nomeLimpo,
+      criadoPor: usuario?.id ?? '',
+      online,
+    })
+    carregarDoCache()
+    if (r.erro !== undefined) {
+      if (eSessaoExpirada(r.erro)) return
+    }
+    if (r.noServidor) {
+      toast.success('Tarefa adicionada')
+    } else {
+      toast.success('Tarefa adicionada', {
+        description: online
+          ? 'Sem permissão agora — ficou no aparelho e tenta subir ao sincronizar.'
+          : 'Salva no aparelho; sobe para o servidor quando o sinal voltar.',
+      })
+    }
+  }
   async function sincronizarAgora() {
     setSincronizando(true)
     try {
@@ -309,10 +352,57 @@ export default function ChecklistObra({ obra, onVoltar }: Props) {
                   )
                 })}
               </ul>
+
+              <AdicionarTarefa
+                onSalvar={(nome) => {
+                  void adicionarTarefa(ambiente, nome)
+                }}
+                onCancelar={() => undefined}
+              />
             </section>
           )
         })}
       </main>
+    </div>
+  )
+}
+
+/** Campo inline para digitar o nome da tarefa nova e salvá-la na seção. */
+function FormTarefaAvulsa({
+  onSalvar,
+  onCancelar,
+}: {
+  onSalvar: (nome: string) => void
+  onCancelar: () => void
+}) {
+  const [nome, setNome] = useState('')
+
+  function salvar() {
+    if (nome.trim()) onSalvar(nome)
+  }
+
+  return (
+    <div className="mt-2 rounded-lg border bg-card p-3">
+      <Input
+        autoFocus
+        value={nome}
+        onChange={(e) => setNome(e.target.value)}
+        placeholder="Nome da tarefa (ex.: Trocar lâmpada do nicho)"
+        aria-label="Nome da tarefa"
+        className="text-sm"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') salvar()
+          if (e.key === 'Escape') onCancelar()
+        }}
+      />
+      <div className="mt-2 flex justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={onCancelar}>
+          Cancelar
+        </Button>
+        <Button size="sm" onClick={salvar} disabled={!nome.trim()}>
+          Salvar tarefa
+        </Button>
+      </div>
     </div>
   )
 }

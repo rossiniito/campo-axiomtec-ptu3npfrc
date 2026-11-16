@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-16T11:30:44.735Z",
+  "generatedAt": "2026-11-16T12:36:38.461Z",
   "collections": [
     {
       "name": "users",
@@ -197,7 +197,7 @@
       "apiRules": {
         "list": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
         "view": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
-        "create": "@request.auth.perfil = \"gestor\"",
+        "create": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
         "update": "@request.auth.id != \"\" && (@request.auth.perfil = \"gestor\" || obra.tecnicos ~ @request.auth.id)",
         "delete": "@request.auth.perfil = \"gestor\""
       },
@@ -284,6 +284,26 @@
           "type": "text",
           "required": false,
           "system": false
+        },
+        {
+          "name": "avulso",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "criado_por",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "modelo",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "modelos"
         }
       ],
       "indexes": []
